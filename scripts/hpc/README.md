@@ -10,6 +10,7 @@ venv at `$VSC_DATA/venvs/neurofield-env`.
 | `setup.sh` | local machine, once | Prepares the cluster: repository, venv, data, LPIPS weights |
 | `train.sh` | local machine or login node | Submits one task as a GPU job |
 | `pull_logs.sh` | local machine | Copies `logs/` from the cluster |
+| `JOBS.md` | — | Every job of this work: benchmarks and ablations |
 
 The cluster runs committed code only. Run from the local machine, `setup.sh`
 and `train.sh` first push local commits to GitHub, then bring the cluster's

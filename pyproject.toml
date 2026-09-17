@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neurofield"
+version = "0.1.0"
+description = "PyTorch implementation of neural fields (implicit neural representations)"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Pooya Ashtari", email = "pooya.ash@gmail.com"},
+]
+keywords = ["neural fields", "implicit neural representations", "INR", "pytorch", "deep learning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.10.0",
+    "torchvision>=0.25.0",
+    "torchmetrics>=1.8.2",
+    "numpy>=2.3.5",
+    "Pillow>=12.1.1",
+    "matplotlib>=3.10.8",
+    "tqdm>=4.67.3",
+    "scipy>=1.17.1",
+    "pandas>=3.0.1",
+    "seaborn>=0.13.2",
+    "kornia>=0.8.2",
+    "opt-einsum>=3.4.0",
+]
+
+[project.optional-dependencies]
+3d = [
+    "PyMCubes>=0.1.6",
+    "trimesh>=4.11.2",
+    "open3d>=0.19.0",
+]
+nerf = [
+    "nerfacc>=0.5.2",  # CUDA occupancy-grid sampling (pure-PyTorch fallback built in)
+    "imageio>=2.34",   # novel-view video export
+]
+dev = [
+    "black>=26.1",
+    "pyinstrument>=5.1.2",
+    "pytest>=7.0",
+]
+# Optional fused hash-grid/MLP kernels (build from source, CUDA toolkit needed):
+# pip install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
+
+[project.urls]
+Homepage = "https://github.com/pashtari/neurofield"
+Repository = "https://github.com/pashtari/neurofield"
+
+[tool.setuptools.packages.find]
+include = ["neurofield*"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]

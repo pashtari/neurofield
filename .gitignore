@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# unwanted folders
+.trash/
+.claude/
+.old_experiments/
+.todo_notebooks/
+data/
+paper/
+poster/
+slides/
+experiments/

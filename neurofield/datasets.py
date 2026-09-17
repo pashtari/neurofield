@@ -12,6 +12,7 @@ to reconstruction). DIP uses a fixed noise input instead of coordinates.
 import math
 import os
 import random
+import warnings
 from pathlib import Path
 from typing import Any, Literal, Self
 
@@ -484,7 +485,8 @@ class OccupancyCoordinateDataset(ImageCoordinateDataset):
 
         ``x`` has shape ``(1, D, H, W)`` or ``(D, H, W)``; output suffixes replace
         that of ``path``. ``smooth=True`` applies Gaussian smoothing (sigma 1)
-        before marching cubes at iso-level zero.
+        before marching cubes at iso-level zero. Rendering needs a display, so
+        without one only the mesh is written and a warning is issued.
         """
         import mcubes
         import open3d as o3d
@@ -498,6 +500,12 @@ class OccupancyCoordinateDataset(ImageCoordinateDataset):
 
         vertices, triangles = mcubes.marching_cubes(volume, 0)
         mcubes.export_mesh(vertices, triangles, dae_path)
+
+        if not os.environ.get("DISPLAY"):
+            # Open3D renders through GLFW, which aborts the process when it
+            # cannot open a window, so check before creating one.
+            warnings.warn(f"No display; saved {dae_path.name} without a render.")
+            return
 
         mesh = o3d.geometry.TriangleMesh()
         mesh.vertices = o3d.utility.Vector3dVector(vertices)

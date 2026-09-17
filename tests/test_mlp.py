@@ -103,10 +103,17 @@ def test_callable_hidden_activations_match_modules(activation, module_activation
 
 @pytest.mark.parametrize("output_activation", [torch.sigmoid, nn.PReLU(init=0.25)])
 def test_output_activation_accepts_callable_or_module(output_activation):
-    model = nf.MLP(1, 1, hidden_layers=0, output_activation=output_activation)
+    model = nf.MLP(
+        1,
+        1,
+        hidden_layers=1,
+        activation=nn.Identity(),
+        output_activation=output_activation,
+    )
     with torch.no_grad():
-        model.layers[0].weight.fill_(1)
-        model.layers[0].bias.zero_()
+        for layer in model.layers:
+            layer.weight.fill_(1)
+            layer.bias.zero_()
     x = torch.tensor([[[-2.0], [2.0]]])
 
     output = model(x)
@@ -130,33 +137,16 @@ def test_custom_layers_own_their_activation_and_receive_kwargs():
     torch.testing.assert_close(model(x), torch.sin(2 * torch.sin(2 * x)))
 
 
-@pytest.mark.parametrize("hidden_features", [None, 4])
-def test_zero_hidden_layers_skip_activation_and_preserve_signed_output(hidden_features):
-    def unused_activation(x):
-        raise AssertionError("A model without hidden layers must not call activation.")
-
-    model = nf.MLP(2, 1, hidden_features, hidden_layers=0, activation=unused_activation)
-    model.load_state_dict(
-        {"layers.0.weight": torch.tensor([[1.0, 2.0]]), "layers.0.bias": torch.zeros(1)}
-    )
-
-    torch.testing.assert_close(
-        model(torch.tensor([[-1.0, -2.0]])), torch.tensor([[-5.0]])
-    )
-
-
 @pytest.mark.parametrize("activation", [nn.ReLU(), torch.relu])
 def test_custom_layers_reject_an_additional_hidden_activation(activation):
     with pytest.raises(ValueError, match="activation"):
         nf.MLP(2, 1, activation=activation, layer_class=nf.SineLayer)
 
 
-@pytest.mark.parametrize(
-    ("hidden_layers", "layer_class", "message"),
-    [(-1, None, ">= 0"), (-1, nf.SineLayer, ">= 1"), (0, nf.SineLayer, ">= 1")],
-)
-def test_invalid_hidden_layer_counts(hidden_layers, layer_class, message):
-    with pytest.raises(ValueError, match=message):
+@pytest.mark.parametrize("layer_class", [None, nf.SineLayer])
+@pytest.mark.parametrize("hidden_layers", [0, -1])
+def test_invalid_hidden_layer_counts(hidden_layers, layer_class):
+    with pytest.raises(ValueError, match="hidden_layers must be >= 1"):
         nf.MLP(2, 1, hidden_layers=hidden_layers, layer_class=layer_class)
 
 

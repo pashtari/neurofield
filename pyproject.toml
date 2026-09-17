@@ -37,11 +37,13 @@ dependencies = [
     "seaborn>=0.13.2",
     "kornia>=0.8.2",
     "opt-einsum>=3.4.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
 3d = [
     "PyMCubes>=0.1.6",
+    "pycollada>=0.9",  # mcubes.export_mesh writes COLLADA through it
     "trimesh>=4.11.2",
     "open3d>=0.19.0",
 ]

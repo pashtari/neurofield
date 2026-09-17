@@ -29,7 +29,7 @@ class GAPlanes(nn.Module):
         resolution: Resolution per axis per grid, with the same int/sequence
             rules as ``features``.
         hidden_features: Decoder hidden width.
-        hidden_layers: Number of decoder hidden layers; zero gives a linear decoder.
+        hidden_layers: Number of decoder hidden layers; at least one.
         output_activation: Optional callable applied to the output.
 
     See Sivgin et al., "Geometric Algebra Planes: Convex Implicit Neural

@@ -240,9 +240,7 @@ class TestSparseEqualsDense:
 
 class TestCombiners:
     @pytest.mark.parametrize("device", DEVICES)
-    @pytest.mark.parametrize(
-        "combiner_cls", [CPCombiner, TRCombiner]
-    )
+    @pytest.mark.parametrize("combiner_cls", [CPCombiner, TRCombiner])
     def test_matches_dense_path(self, device, combiner_cls):
         torch.manual_seed(0)
         K, C = 32, 2

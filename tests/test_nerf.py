@@ -61,7 +61,7 @@ DENSITY_NETS = {
     "GA-Planes": (
         nf.GAPlanes,
         {
-            "num_features": 12,
+            "features": 12,
             "resolution": (64, 16),
             "hidden_features": 64,
             "hidden_layers": 2,

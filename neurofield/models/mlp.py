@@ -32,8 +32,7 @@ class MLP(nn.Module):
         in_features: Input width.
         out_features: Output width.
         hidden_features: Hidden width; ``None`` defaults to ``in_features``.
-        hidden_layers: Number of hidden layers; zero gives a single linear layer
-            when ``layer_class`` is omitted. Custom layers require at least one.
+        hidden_layers: Number of hidden layers; at least one.
         activation: Callable applied after each standard hidden linear layer;
             ``None`` selects ReLU. Module instances are shared across hidden
             layers. Cannot be combined with ``layer_class``.
@@ -58,11 +57,8 @@ class MLP(nn.Module):
     ) -> None:
         super().__init__()
 
-        min_hidden_layers = 0 if layer_class is None else 1
-        if hidden_layers < min_hidden_layers:
-            raise ValueError(
-                f"hidden_layers must be >= {min_hidden_layers}, got {hidden_layers}"
-            )
+        if hidden_layers < 1:
+            raise ValueError(f"hidden_layers must be >= 1, got {hidden_layers}")
         if layer_class is None:
             layer_class = nn.Linear
             activation = torch.relu if activation is None else activation

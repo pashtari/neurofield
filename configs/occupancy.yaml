@@ -1,0 +1,168 @@
+# Occupancy volume representation: fit each model to one Stanford shape.
+#
+# Each model has a neurofield class, its constructor arguments, and training
+# arguments that override the shared ones. "deviation" marks a departure from
+# the authors' published settings.
+
+data:
+  resolution: 256  # occupancy grid resolution
+  subsample: 0.01  # fraction of voxels in each training step
+
+train:
+  num_epochs: 2000
+  log_interval: 100
+  eval_interval: 100
+  chunk_size: 262144  # voxels per evaluation forward pass
+  seed: 0
+
+models:
+  RFF:  # Tancik et al. (NeurIPS 2020), 3D occupancy
+    class: RFF
+    kwargs:
+      hidden_features: 188
+      hidden_layers: 2
+      num_frequencies: 256
+      sigma: 6.0  # sigma 12 on [0, 1] coordinates equals 6 on [-1, 1]
+      output_activation: tanh
+    train: {lr: 5.0e-4}
+
+  PE-MLP:  # FINER benchmark architecture
+    class: PEMLP
+    kwargs:
+      hidden_features: 240
+      hidden_layers: 3
+      num_frequencies: 10
+      output_activation: tanh
+    train: {lr: 3.0e-3}  # deviation: the published 1e-3 and 5e-4 lose 1-3 IoU points here
+
+  MFN:  # GaborNet (Fathony et al., ICLR 2021) defaults
+    class: MFN
+    kwargs:
+      hidden_features: 252
+      hidden_layers: 3
+      input_scale: 256.0
+      alpha: 6.0
+      beta: 1.0
+      weight_scale: 1.0
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  SIREN:  # FINER benchmark
+    class: SIREN
+    kwargs:
+      hidden_features: 256
+      hidden_layers: 3
+      omega: 30.0
+      output_activation: tanh
+    train: {lr: 5.0e-4}  # the SDF lr 1e-4 is too slow for 2000 epochs; image lr used
+
+  Gauss:  # FINER benchmark
+    class: Gauss
+    kwargs:
+      hidden_features: 256
+      hidden_layers: 3
+      scale: 30.0
+      output_activation: tanh
+    train: {lr: 1.0e-3}  # deviation: the published 1e-4 and 5e-3 lose 5-10 IoU points
+
+  WIRE:  # WIRE occupancy script, real Gabor layer
+    class: RealWIRE
+    kwargs:
+      hidden_features: 256
+      hidden_layers: 3
+      omega: 10.0
+      scale: 40.0
+      output_activation: tanh
+    train: {lr: 1.0e-3}  # deviation: the official 5e-3 diverges for the real Gabor layer
+
+  FINER:  # FINER benchmark
+    class: FINER
+    kwargs:
+      hidden_features: 256
+      hidden_layers: 3
+      omega: 30.0
+      output_activation: tanh
+    train: {lr: 5.0e-4}  # the SDF lr 1e-4 is too slow for 2000 epochs; image lr used
+
+  Instant-NGP:  # instant-ngp configs/volume/base.json architecture
+    class: InstantNGP
+    kwargs:
+      num_levels: 16
+      features_per_level: 2
+      log2_hashmap_size: 12
+      base_resolution: 16
+      max_resolution: 256  # the grid resolution
+      hidden_features: 64
+      hidden_layers: 2
+      output_activation: tanh
+    # deviation: the volume lr 1e-4 (tuned for long schedules) loses 9 IoU
+    # points; 1e-2 is the reference lr for images and NeRF.
+    train: {lr: 1.0e-2, adam_betas: [0.9, 0.99], adam_eps: 1.0e-15}
+
+  TensoRF-CP:
+    class: TensoRF
+    kwargs:
+      rank: 128
+      resolution: 256
+      mode: cp
+      hidden_features: 128
+      hidden_layers: 2
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  TensoRF-VM:
+    class: TensoRF
+    kwargs:
+      rank: 33
+      resolution: 32
+      mode: vm
+      hidden_features: 128
+      hidden_layers: 2
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  GA-Planes:
+    class: GAPlanes
+    kwargs:
+      features: 25
+      resolution: [128, 32, 8]
+      hidden_features: 128
+      hidden_layers: 2
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-cosine:
+    class: FUTON
+    kwargs:
+      basis: [cosine, {num_components: 256, grid_size: 256}]
+      combiner: [cp, {rank: 144}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 256, grid_size: 256}]
+      combiner: [cp, {rank: 144}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-triangle:
+    class: FUTON
+    kwargs:
+      basis: [triangle, {num_components: 256}]
+      combiner: [cp, {rank: 144}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 256, radius: 3}]
+      combiner: [cp, {rank: 144}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}

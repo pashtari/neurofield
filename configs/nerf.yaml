@@ -1,0 +1,164 @@
+# Novel view synthesis: fit each model to one Blender scene under FINER's
+# protocol (torch-ngp --downscale 4 --trainskip 4 --iter 37500).
+#
+# Each model gives the neurofield class and constructor arguments of the
+# density network, and training arguments that override the shared ones. All
+# models share the radiance-field heads and renderer. "deviation" marks a
+# departure from the authors' published settings.
+
+data:
+  downsample: 4  # 200x200 views (torch-ngp --downscale)
+  train_skip: 4  # 25 of the 100 train views (torch-ngp --trainskip)
+  val_skip: 25  # 4 validation views for the learning curve
+
+field:
+  geometry_features: 15
+  direction_encoding: sh
+  color_net: [mlp, {hidden_features: 64, hidden_layers: 2}]
+
+train:
+  num_steps: 37500  # torch-ngp --iter
+  num_rays: 4096  # torch-ngp --num_rays
+  max_samples_per_ray: 1024  # torch-ngp --max_steps
+  log_interval: 100
+  eval_interval: 2500
+  seed: 0
+
+render_views: [0, 55]  # test views saved as images
+
+models:
+  RFF:
+    class: RFF
+    kwargs:
+      hidden_features: 180
+      hidden_layers: 2
+      num_frequencies: 90
+      sigma: 8.0
+    train: {lr: 1.0e-2}
+
+  PE-MLP:
+    class: PEMLP
+    kwargs:
+      hidden_features: 180
+      hidden_layers: 3
+      num_frequencies: 10
+    train: {lr: 1.0e-2}
+
+  MFN:  # GaborNet (Fathony et al., ICLR 2021)
+    class: MFN
+    kwargs:
+      hidden_features: 176
+      hidden_layers: 3
+      # deviation: the official input_scale 256 and alpha 6 are
+      # 2.7 dB worse on the validation views.
+      input_scale: 128.0
+      alpha: 2.0
+      beta: 1.0
+      weight_scale: 1.0
+    train: {lr: 1.0e-2}
+
+  SIREN:
+    class: SIREN
+    kwargs:
+      hidden_features: 180
+      hidden_layers: 3
+      omega: 30.0
+    train: {lr: 1.0e-3}
+
+  Gauss:
+    class: Gauss
+    kwargs:
+      hidden_features: 180
+      hidden_layers: 3
+      scale: 30.0
+    train: {lr: 1.0e-3}
+
+  WIRE:
+    class: RealWIRE
+    kwargs:
+      hidden_features: 180
+      hidden_layers: 3
+      omega: 20.0
+      scale: 10.0
+    train: {lr: 3.0e-3}
+
+  FINER:
+    class: FINER
+    kwargs:
+      hidden_features: 180
+      hidden_layers: 3
+      omega: 30.0
+    train: {lr: 1.0e-3}
+
+  Instant-NGP:  # instant-ngp density network, paper hash grid
+    class: InstantNGP
+    kwargs:
+      num_levels: 16
+      features_per_level: 2
+      log2_hashmap_size: 11
+      base_resolution: 16
+      max_resolution: 2048
+      hidden_features: 64
+      hidden_layers: 1
+    train: {lr: 1.0e-2}
+
+  TensoRF-CP:
+    class: TensoRF
+    kwargs:
+      rank: 56
+      resolution: 256
+      mode: cp
+      hidden_features: 128
+      hidden_layers: 2
+    train: {lr: 3.0e-2}
+
+  TensoRF-VM:
+    class: TensoRF
+    kwargs:
+      rank: 14
+      resolution: 32
+      mode: vm
+      hidden_features: 128
+      hidden_layers: 2
+    train: {lr: 3.0e-2}
+
+  GA-Planes:
+    class: GAPlanes
+    kwargs:
+      resolution: [128, 32, 4]
+      features: 12
+      hidden_features: 128
+      hidden_layers: 2
+    train: {lr: 3.0e-2}
+
+  FUTON-cosine:
+    class: FUTON
+    kwargs:
+      basis: [cosine, {num_components: 128}]
+      combiner: [cp, {rank: 128}]
+      decoder: [mlp, {hidden_layers: 1}]
+    train: {lr: 3.0e-2}
+
+  FUTON-sinc:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 128}]
+      combiner: [cp, {rank: 128}]
+      decoder: [mlp, {hidden_layers: 1}]
+    train: {lr: 3.0e-2}
+
+  FUTON-triangle:
+    class: FUTON
+    kwargs:
+      basis: [triangle, {num_components: 128}]
+      combiner: [cp, {rank: 128}]
+      decoder: [mlp, {hidden_layers: 1}]
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 128}]
+      decoder: [mlp, {hidden_layers: 1}]
+    train: {lr: 3.0e-2}

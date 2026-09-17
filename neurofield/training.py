@@ -85,6 +85,8 @@ def train(
     num_epochs: int = 1000,
     lr: float = 0.01,
     weight_decay: float = 0.0,
+    adam_betas: tuple[float, float] = (0.9, 0.999),
+    adam_eps: float = 1e-8,
     quantize: bool = False,
     quant_max: int = 127,
     quant_interval: int = -1,
@@ -93,6 +95,7 @@ def train(
     log_interval: int = 1,
     eval_interval: int | None = None,
     chunk_size: int | None = None,
+    save_reconstruction: bool = True,
     device: str | torch.device | None = None,
     ckpt_path: str | os.PathLike[str] | None = None,
     log_dir: str | os.PathLike[str] | None = None,
@@ -115,6 +118,8 @@ def train(
         num_epochs: Number of training epochs.
         lr: Initial learning rate.
         weight_decay: Adam weight decay.
+        adam_betas: Adam moment decay rates; hash grids use ``(0.9, 0.99)``.
+        adam_eps: Adam epsilon; hash grids use ``1e-15``.
         quantize: Enable quantized evaluation and final in-place quantization.
         quant_max: Largest integer quantization level.
         quant_interval: Epochs between intermediate fake-quantization steps.
@@ -126,6 +131,8 @@ def train(
         eval_interval: Epochs between evaluations. ``None`` or zero evaluates
             at the end; negative values disable evaluation.
         chunk_size: Coordinates per evaluation forward pass; ``None`` uses all.
+        save_reconstruction: Save each evaluation's reconstruction under
+            ``log_dir``; see :func:`evaluate`.
         device: Training device; ``None`` selects CUDA when available, else CPU.
         ckpt_path: State dict to load first, if the file exists.
         log_dir: Directory for logs, reconstructions and ``checkpoint.pt``.
@@ -181,13 +188,21 @@ def train(
     if loss_fn is None:
         loss_fn = _mse_loss
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=lr,
+        betas=adam_betas,
+        eps=adam_eps,
+        weight_decay=weight_decay,
+    )
     logger.info("Optimizer: %s", type(optimizer).__name__)
     config["optimizer"] = type(optimizer).__name__
     logger.info("Learning rate: %f", lr)
     config["lr"] = lr
     logger.info("Weight decay: %f", weight_decay)
     config["weight_decay"] = weight_decay
+    config["adam_betas"] = tuple(adam_betas)
+    config["adam_eps"] = adam_eps
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=num_epochs, eta_min=lr / 100
     )
@@ -253,6 +268,7 @@ def train(
                 chunk_size=chunk_size,
                 device=device,
                 log_dir=log_dir,
+                save_reconstruction=save_reconstruction,
             )
             results["eval"] = _average_dicts(eval_results["history"])
 

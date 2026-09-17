@@ -140,6 +140,34 @@ scores = nf.nerf.evaluate(field, renderer, test_dataset)  # PSNR and SSIM by def
 print(scores["mean"])
 ```
 
+## Benchmarks
+
+`scripts/train_<task>.py` fits every model in `configs/<task>.yaml` to every signal of a task:
+
+```bash
+python scripts/train_image.py       # 24 Kodak images    -> logs/image/<image>/<model>/
+python scripts/train_occupancy.py   # 5 Stanford shapes  -> logs/occupancy/<shape>/<model>/
+python scripts/train_nerf.py        # Blender scenes     -> logs/nerf/<scene>/<model>/
+```
+
+`--data`, `--models`, `--device`, `--log-dir`, and `--config` select the signals, models, device, output directory, and config, e.g. `python scripts/train_image.py --data data/Kodak/kodim01.png --models SIREN FINER --device cuda:1`. By default, the scripts use every signal found under `data/`. Finished runs are skipped, so an interrupted sweep can simply be restarted; a failed run writes `error.txt` and the sweep continues.
+
+The YAML configs hold the shared data and training settings and, per model, its `neurofield` class, constructor arguments, and training overrides (e.g. the learning rate). Image configs may use size expressions in the image height `H` and width `W`, such as `max(H, W) // 2`.
+
+For an ablation, layer a config holding only what changes, and give the variants their own names so they do not collide with the defaults; `--set` overrides single values, and `--overwrite` reruns finished runs instead of skipping them:
+
+```bash
+python scripts/train_image.py --config configs/image.yaml configs/ablation.yaml
+python scripts/train_image.py --set models.SIREN.train.lr=0.001 --log-dir logs/ablation-lr
+```
+
+Each run directory holds `log.txt`, `log.json`, `checkpoint.pt`, the final reconstruction (NeRF: selected test views), and `results.json` with the model setup, parameter count, training time, final metrics (NeRF: all 200 test views), and training history. Collect them with:
+
+```python
+records = [json.loads(p.read_text()) for p in Path("logs").rglob("results.json")]
+table = pd.json_normalize(records)
+```
+
 ## Package Structure
 
 ```

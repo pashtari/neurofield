@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """Download meshes from the Stanford 3D Scanning Repository.
 
-Downloads the same meshes used in FINER (CVPR 2024) and BACON (CVPR 2022)
-directly from the official Stanford source:
+The 5 meshes used by FINER (CVPR 2024) and BACON (CVPR 2022), fetched from the
+official source:
 
     http://graphics.stanford.edu/data/3Dscanrep/
 
-After downloading, neurofield's PointCloudDataset applies the same
-normalization as FINER/BACON (center on vertex mean, scale to 90% of
-[-0.5, 0.5]) and voxelizes with trimesh. Results are cached as .pt files.
+Some releases are not in canonical pose, so their vertices are rotated to
+Y-up and front-facing. ``OccupancyCoordinateDataset`` then centers and scales
+each mesh (FINER's convention) and voxelizes it with trimesh.
 
 Available meshes: armadillo, dragon, happy_buddha, lucy, thai_statue.
 
@@ -19,191 +19,118 @@ Usage:
 
 import argparse
 import gzip
-import os
 import shutil
 import tarfile
 import tempfile
 import urllib.request
+from pathlib import Path
 
-# Official Stanford 3D Scanning Repository URLs
-# "orientation" is a 3x3 matrix applied to vertices so that all meshes end up
-# in canonical pose: Y-up, front facing the camera (+Z toward viewer).
+ROOT = Path(__file__).resolve().parents[1]
+STANFORD = "http://graphics.stanford.edu"
+
+# ``member`` selects the mesh inside a tar archive; ``rotation`` is applied to
+# the vertices, and is omitted for meshes that are already in canonical pose.
 MESHES = {
     "armadillo": {
-        "url": "http://graphics.stanford.edu/pub/3Dscanrep/armadillo/Armadillo.ply.gz",
-        "format": "ply.gz",
-        "orientation": [[1, 0, 0], [0, 1, 0], [0, 0, -1]],
+        "url": f"{STANFORD}/pub/3Dscanrep/armadillo/Armadillo.ply.gz",
+        "rotation": [[1, 0, 0], [0, 1, 0], [0, 0, -1]],
     },
     "dragon": {
-        "url": "http://graphics.stanford.edu/pub/3Dscanrep/dragon/dragon_recon.tar.gz",
-        "format": "tar.gz",
-        "ply_glob": "dragon_vrip.ply",
+        "url": f"{STANFORD}/pub/3Dscanrep/dragon/dragon_recon.tar.gz",
+        "member": "dragon_vrip.ply",
     },
     "happy_buddha": {
-        "url": "http://graphics.stanford.edu/pub/3Dscanrep/happy/happy_recon.tar.gz",
-        "format": "tar.gz",
-        "ply_glob": "happy_vrip.ply",
-        # "orientation": [[0, 0, 1], [0, 1, 0], [-1, 0, 0]],
+        "url": f"{STANFORD}/pub/3Dscanrep/happy/happy_recon.tar.gz",
+        "member": "happy_vrip.ply",
     },
     "lucy": {
-        "url": "http://graphics.stanford.edu/data/3Dscanrep/lucy.tar.gz",
-        "format": "tar.gz",
-        "ply_glob": "lucy.ply",
-        "orientation": [[1, 0, 0], [0, 0, 1], [0, 1, 0]],
+        "url": f"{STANFORD}/data/3Dscanrep/lucy.tar.gz",
+        "member": "lucy.ply",
+        "rotation": [[1, 0, 0], [0, 0, 1], [0, 1, 0]],
     },
     "thai_statue": {
-        "url": "http://graphics.stanford.edu/data/3Dscanrep/xyzrgb/xyzrgb_statuette.ply.gz",
-        "format": "ply.gz",
+        "url": f"{STANFORD}/data/3Dscanrep/xyzrgb/xyzrgb_statuette.ply.gz",
     },
 }
 
 
-def _reporthook(block_num, block_size, total_size):
-    downloaded = block_num * block_size
-    if total_size > 0:
-        pct = min(100, downloaded * 100 // total_size)
-        print(
-            f"\r  {downloaded / 1e6:.1f} / {total_size / 1e6:.1f} MB ({pct}%)",
-            end="",
-            flush=True,
-        )
-    else:
-        print(f"\r  {downloaded / 1e6:.1f} MB", end="", flush=True)
+def report(count: int, block_size: int, total: int) -> None:
+    """Print progress every 10 MB (:func:`urllib.request.urlretrieve` callback)."""
+    downloaded = count * block_size
+    if downloaded % (10 * 2**20) < block_size:
+        total_mb = f"{total / 1e6:.0f}" if total > 0 else "?"
+        print(f"\r  {downloaded / 1e6:.0f} / {total_mb} MB", end="", flush=True)
 
 
-def download_ply_gz(url: str, dest: str) -> None:
-    """Download a gzipped PLY file and decompress it."""
-    with tempfile.NamedTemporaryFile(suffix=".ply.gz", delete=False) as tmp:
-        tmp_path = tmp.name
+def extract(archive: Path, member: str | None, dest: Path) -> None:
+    """Write the mesh in ``archive`` to ``dest``, unwrapping gzip or tar."""
+    if member is None:
+        with gzip.open(archive, "rb") as source, open(dest, "wb") as target:
+            shutil.copyfileobj(source, target)
+        return
 
-    try:
-        urllib.request.urlretrieve(url, tmp_path, reporthook=_reporthook)
-        print()
-        with gzip.open(tmp_path, "rb") as f_in, open(dest, "wb") as f_out:
-            shutil.copyfileobj(f_in, f_out)
-    finally:
-        os.unlink(tmp_path)
-
-
-def download_tar_gz(url: str, ply_glob: str, dest: str) -> None:
-    """Download a tar.gz archive and extract the target PLY file."""
-    with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
-        tmp_path = tmp.name
-
-    try:
-        urllib.request.urlretrieve(url, tmp_path, reporthook=_reporthook)
-        print()
-
-        with tarfile.open(tmp_path, "r:gz") as tar:
-            # Find the target PLY member
-            ply_member = None
-            for member in tar.getmembers():
-                if member.name.endswith(ply_glob):
-                    ply_member = member
-                    break
-
-            if ply_member is None:
-                # Fallback: find any .ply file
-                for member in tar.getmembers():
-                    if member.name.endswith(".ply"):
-                        ply_member = member
-                        break
-
-            if ply_member is None:
-                raise FileNotFoundError(
-                    f"No PLY file matching '{ply_glob}' found in archive. " f"Contents: {[m.name for m in tar.getmembers()[:20]]}"
-                )
-
-            print(f"  Extracting {ply_member.name} ...")
-            with tar.extractfile(ply_member) as f_in, open(dest, "wb") as f_out:
-                shutil.copyfileobj(f_in, f_out)
-    finally:
-        os.unlink(tmp_path)
+    with tarfile.open(archive, "r:gz") as tar:
+        names = [name for name in tar.getnames() if name.endswith(member)]
+        if not names:
+            raise FileNotFoundError(f"no {member} in {archive.name}")
+        with tar.extractfile(names[0]) as source, open(dest, "wb") as target:
+            shutil.copyfileobj(source, target)
 
 
-def orient_mesh(dest: str, orientation: list) -> None:
-    """Apply orientation transform to a PLY mesh for canonical rendering."""
+def rotate(path: Path, rotation: list[list[int]]) -> None:
+    """Rotate a mesh in place into canonical pose."""
     import numpy as np
     import trimesh
 
-    mesh = trimesh.load(dest, force="mesh")
-
-    R = np.array(orientation, dtype=np.float64)
     transform = np.eye(4)
-    transform[:3, :3] = R
+    transform[:3, :3] = np.array(rotation, dtype=np.float64)
+
+    mesh = trimesh.load(path, force="mesh")
     mesh.apply_transform(transform)
-
-    # Fix face winding if transform includes a reflection
-    if np.linalg.det(R) < 0:
+    if np.linalg.det(transform[:3, :3]) < 0:  # a reflection flips face winding
         mesh.invert()
-
-    mesh.export(dest)
-    print(f"  Applied orientation transform to {dest}")
+    mesh.export(path)
 
 
-def download_mesh(name: str, info: dict, output_dir: str, force: bool = False) -> None:
-    dest = os.path.join(output_dir, f"{name}.ply")
-    if os.path.exists(dest) and not force:
-        print(f"  {dest} already exists — skipping.")
+def download_mesh(name: str, info: dict, output_dir: Path, force: bool) -> None:
+    dest = output_dir / f"{name}.ply"
+    if dest.exists() and not force:
+        print(f"  {dest.name} exists, skipping")
         return
 
-    url = info["url"]
-    fmt = info["format"]
-    print(f"  [{name}] {url}")
+    print(f"  [{name}] {info['url']}")
+    suffix = ".tar.gz" if "member" in info else ".ply.gz"
+    with tempfile.NamedTemporaryFile(suffix=suffix) as archive:
+        urllib.request.urlretrieve(info["url"], archive.name, reporthook=report)
+        print()
+        extract(Path(archive.name), info.get("member"), dest)
 
-    if fmt == "ply.gz":
-        download_ply_gz(url, dest)
-    elif fmt == "tar.gz":
-        download_tar_gz(url, info.get("ply_glob", ".ply"), dest)
-    else:
-        raise ValueError(f"Unknown format: {fmt}")
-
-    size_mb = os.path.getsize(dest) / 1e6
-    print(f"  Saved {dest} ({size_mb:.1f} MB)")
-
-    # Apply canonical orientation so PointCloudDataset renders correctly
-    orientation = info.get("orientation")
-    if orientation:
-        orient_mesh(dest, orientation)
+    if "rotation" in info:
+        rotate(dest, info["rotation"])
+    print(f"  {dest.name} ({dest.stat().st_size / 1e6:.1f} MB)")
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default=None,
-        help="Directory to save .ply files (default: data/occupancy)",
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
+    parser.add_argument("--output-dir", type=Path, default=ROOT / "data" / "occupancy")
     parser.add_argument(
         "--meshes",
-        nargs="*",
-        default=None,
-        help=f"Subset to download (default: all). Choices: {', '.join(MESHES)}",
+        nargs="+",
+        default=list(MESHES),
+        choices=list(MESHES),
+        metavar="MESH",
+        help="Subset to download (default: all)",
     )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Re-download and reorient even if files already exist",
-    )
+    parser.add_argument("--force", action="store_true", help="Re-download files")
     args = parser.parse_args()
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(script_dir)
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    for name in args.meshes:
+        download_mesh(name, MESHES[name], args.output_dir, args.force)
 
-    output_dir = args.output_dir or os.path.join(project_dir, "data", "occupancy")
-    os.makedirs(output_dir, exist_ok=True)
-
-    meshes = args.meshes or list(MESHES.keys())
-    for name in meshes:
-        if name not in MESHES:
-            print(f"  Unknown mesh '{name}', skipping. Available: {list(MESHES)}")
-            continue
-        download_mesh(name, MESHES[name], output_dir, force=args.force)
-
-    print("\nDone! Files saved to:", output_dir)
-    print("PointCloudDataset will normalize using FINER/BACON convention and cache")
-    print("voxelized grids on first load.")
+    print(f"Done. Meshes in {args.output_dir}")
 
 
 if __name__ == "__main__":

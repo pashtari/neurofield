@@ -28,7 +28,7 @@ class TensoRF(GAPlanes):
         resolution: Resolution per axis of each grid.
         mode: ``"cp"`` or ``"vm"``; ``"vm"`` becomes ``"cp"`` in 2D.
         hidden_features: Decoder hidden width.
-        hidden_layers: Number of decoder hidden layers; zero gives a linear decoder.
+        hidden_layers: Number of decoder hidden layers; at least one.
         output_activation: Optional callable applied to the output.
     """
 

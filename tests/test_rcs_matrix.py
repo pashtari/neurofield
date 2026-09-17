@@ -18,7 +18,7 @@ def make_rcs(M, N, L, device="cpu", requires_grad=False, zero_pad_rows=False, se
     g = torch.Generator().manual_seed(seed)
     values = torch.randn(M, L, generator=g)
     if zero_pad_rows and M > 0:
-        values[::2, L // 2:] = 0.0  # rows with fewer than L non-zeros
+        values[::2, L // 2 :] = 0.0  # rows with fewer than L non-zeros
     values = values.to(device).requires_grad_(requires_grad)
     start_cols = torch.randint(0, max(N - L + 1, 1), (M,), generator=g).to(device)
     return RCSMatrix(values, start_cols, N), values, start_cols
@@ -27,7 +27,14 @@ def make_rcs(M, N, L, device="cpu", requires_grad=False, zero_pad_rows=False, se
 class TestMatmul:
     @pytest.mark.parametrize(
         "M, N, L, K",
-        [(7, 11, 3, 5), (1, 1, 1, 1), (4, 6, 6, 3), (32, 100, 1, 8), (0, 10, 4, 2), (5, 8, 3, 1)],
+        [
+            (7, 11, 3, 5),
+            (1, 1, 1, 1),
+            (4, 6, 6, 3),
+            (32, 100, 1, 8),
+            (0, 10, 4, 2),
+            (5, 8, 3, 1),
+        ],
     )
     def test_matches_dense(self, M, N, L, K):
         A, _, _ = make_rcs(M, N, L, zero_pad_rows=True)
@@ -105,7 +112,7 @@ class TestToDense:
         dense = A.to_dense()
         for i in range(6):
             row = torch.zeros(12)
-            row[start_cols[i]: start_cols[i] + 4] = values[i]
+            row[start_cols[i] : start_cols[i] + 4] = values[i]
             assert torch.equal(dense[i], row)
 
 
@@ -124,7 +131,9 @@ class TestAutograd:
         values = torch.randn(4, 3, dtype=torch.float64, requires_grad=True)
         start_cols = torch.randint(0, 6, (4,))
         B = torch.randn(8, 2, dtype=torch.float64, requires_grad=True)
-        assert torch.autograd.gradcheck(lambda g, b: RCSMatrix(g, start_cols, 8) @ b, (values, B))
+        assert torch.autograd.gradcheck(
+            lambda g, b: RCSMatrix(g, start_cols, 8) @ b, (values, B)
+        )
 
     def test_gradgradcheck(self):
         values = torch.randn(4, 3, dtype=torch.float64, requires_grad=True)
@@ -137,7 +146,9 @@ class TestAutograd:
     def test_to_dense_gradcheck(self):
         values = torch.randn(4, 3, dtype=torch.float64, requires_grad=True)
         start_cols = torch.randint(0, 6, (4,))
-        assert torch.autograd.gradcheck(lambda g: RCSMatrix(g, start_cols, 8).to_dense(), (values,))
+        assert torch.autograd.gradcheck(
+            lambda g: RCSMatrix(g, start_cols, 8).to_dense(), (values,)
+        )
 
 
 class TestMetadata:
@@ -164,8 +175,16 @@ class TestValidation:
             (torch.randn(3, 2), torch.tensor([0, 1, 4]), 5),  # segment out of range
             (torch.randn(3, 2), torch.zeros(4, dtype=torch.long), 5),  # wrong J shape
             (torch.randn(3), torch.zeros(3, dtype=torch.long), 5),  # 1D values
-            (torch.randn(0, 3), torch.zeros(0, dtype=torch.long), -5),  # negative N, M=0
-            (torch.randn(3, 2), torch.zeros(3, dtype=torch.long), -7),  # negative N, M>0
+            (
+                torch.randn(0, 3),
+                torch.zeros(0, dtype=torch.long),
+                -5,
+            ),  # negative N, M=0
+            (
+                torch.randn(3, 2),
+                torch.zeros(3, dtype=torch.long),
+                -7,
+            ),  # negative N, M>0
         ],
     )
     def test_rejected(self, values, start_cols, num_cols):
@@ -228,7 +247,9 @@ class TestCuda:
         assert torch.allclose(m.A.to_dense().detach(), ref)
 
     def test_cuda_gradcheck(self):
-        values = torch.randn(4, 3, dtype=torch.float64, device="cuda", requires_grad=True)
+        values = torch.randn(
+            4, 3, dtype=torch.float64, device="cuda", requires_grad=True
+        )
         start_cols = torch.randint(0, 6, (4,), device="cuda")
         B = torch.randn(8, 2, dtype=torch.float64, device="cuda", requires_grad=True)
         # nondet_tol: the triton grad_B kernel accumulates with float atomics
@@ -237,7 +258,9 @@ class TestCuda:
         )
 
     def test_cuda_gradgradcheck(self):
-        values = torch.randn(4, 3, dtype=torch.float64, device="cuda", requires_grad=True)
+        values = torch.randn(
+            4, 3, dtype=torch.float64, device="cuda", requires_grad=True
+        )
         start_cols = torch.randint(0, 6, (4,), device="cuda")
         B = torch.randn(8, 2, dtype=torch.float64, device="cuda", requires_grad=True)
         assert torch.autograd.gradgradcheck(

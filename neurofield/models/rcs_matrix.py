@@ -255,22 +255,24 @@ if triton is not None:
             triton.cdiv(num_rows, meta["BLOCK_M"]),
             triton.cdiv(out_features, meta["BLOCK_K"]),
         )
-        _rcs_fwd_kernel[grid](
-            values,
-            start_cols,
-            other,
-            out,
-            num_rows,
-            out_features,
-            values.stride(0),
-            values.stride(1),
-            other.stride(0),
-            other.stride(1),
-            out.stride(0),
-            out.stride(1),
-            L=segment_length,
-            ACC_DTYPE=_accumulator_dtype(values.dtype),
-        )
+        # Triton launches kernels on the current CUDA device.
+        with torch.cuda.device(values.device):
+            _rcs_fwd_kernel[grid](
+                values,
+                start_cols,
+                other,
+                out,
+                num_rows,
+                out_features,
+                values.stride(0),
+                values.stride(1),
+                other.stride(0),
+                other.stride(1),
+                out.stride(0),
+                out.stride(1),
+                L=segment_length,
+                ACC_DTYPE=_accumulator_dtype(values.dtype),
+            )
         return out
 
     def _launch_grad_values(
@@ -291,26 +293,27 @@ if triton is not None:
             return grad_values.zero_()
         block_k = min(128, triton.next_power_of_2(out_features))
         grid = (triton.cdiv(num_rows, 16),)
-        _rcs_bwd_g_kernel[grid](
-            grad_out,
-            start_cols,
-            other,
-            grad_values,
-            num_rows,
-            out_features,
-            grad_out.stride(0),
-            grad_out.stride(1),
-            other.stride(0),
-            other.stride(1),
-            grad_values.stride(0),
-            grad_values.stride(1),
-            L=segment_length,
-            L_P2=triton.next_power_of_2(segment_length),
-            BLOCK_M=16,
-            BLOCK_K=block_k,
-            ACC_DTYPE=_accumulator_dtype(grad_out.dtype),
-            num_warps=4,
-        )
+        with torch.cuda.device(grad_out.device):
+            _rcs_bwd_g_kernel[grid](
+                grad_out,
+                start_cols,
+                other,
+                grad_values,
+                num_rows,
+                out_features,
+                grad_out.stride(0),
+                grad_out.stride(1),
+                other.stride(0),
+                other.stride(1),
+                grad_values.stride(0),
+                grad_values.stride(1),
+                L=segment_length,
+                L_P2=triton.next_power_of_2(segment_length),
+                BLOCK_M=16,
+                BLOCK_K=block_k,
+                ACC_DTYPE=_accumulator_dtype(grad_out.dtype),
+                num_warps=4,
+            )
         return grad_values
 
     def _launch_grad_other(
@@ -334,25 +337,26 @@ if triton is not None:
         )
         block_k = min(128, triton.next_power_of_2(out_features))
         grid = (num_cols, triton.cdiv(out_features, block_k))
-        _rcs_bwd_b_kernel[grid](
-            column_boundaries,
-            source_rows,
-            source_offsets,
-            values,
-            grad_out,
-            grad_other,
-            out_features,
-            values.stride(0),
-            values.stride(1),
-            grad_out.stride(0),
-            grad_out.stride(1),
-            grad_other.stride(0),
-            grad_other.stride(1),
-            BLOCK_E=32,
-            BLOCK_K=block_k,
-            ACC_DTYPE=_accumulator_dtype(acc_dtype),
-            num_warps=4,
-        )
+        with torch.cuda.device(values.device):
+            _rcs_bwd_b_kernel[grid](
+                column_boundaries,
+                source_rows,
+                source_offsets,
+                values,
+                grad_out,
+                grad_other,
+                out_features,
+                values.stride(0),
+                values.stride(1),
+                grad_out.stride(0),
+                grad_out.stride(1),
+                grad_other.stride(0),
+                grad_other.stride(1),
+                BLOCK_E=32,
+                BLOCK_K=block_k,
+                ACC_DTYPE=_accumulator_dtype(acc_dtype),
+                num_warps=4,
+            )
         return grad_other
 
     class _RCSMatmulFn(torch.autograd.Function):

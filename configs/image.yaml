@@ -1,0 +1,156 @@
+# Image representation: fit each model to one Kodak image.
+#
+# Each model has a neurofield class, its constructor arguments, and training
+# arguments that override the shared ones. Arguments may be expressions in the
+# image height H and width W. "deviation" marks a departure from the authors'
+# published settings.
+
+data:
+  subsample: 0.1  # fraction of pixels in each training step
+
+train:
+  num_epochs: 2000
+  log_interval: 100
+  eval_interval: 100
+  seed: 0
+
+models:
+  RFF:  # Tancik et al. (NeurIPS 2020), 2D image regression
+    class: RFF
+    kwargs:
+      hidden_features: 212
+      hidden_layers: 3
+      num_frequencies: 256
+      sigma: 5.0  # sigma 10 on [0, 1] coordinates equals 5 on [-1, 1]
+      output_activation: tanh
+    train: {lr: 1.0e-3}
+
+  PE-MLP:  # FINER image benchmark
+    class: PEMLP
+    kwargs:
+      hidden_features: 248
+      hidden_layers: 4
+      num_frequencies: 10
+      output_activation: tanh
+    train: {lr: 1.0e-3}
+
+  MFN:  # GaborNet (Fathony et al., ICLR 2021)
+    class: MFN
+    kwargs:
+      hidden_features: 252
+      hidden_layers: 4
+      # deviation: the official input_scale 256 and alpha 6 (tuned for
+      # 256 x 256 images) are 6 dB worse here.
+      input_scale: 1024.0
+      alpha: 1.25
+      beta: 0.125
+      weight_scale: 1.0
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  SIREN:  # FINER image benchmark
+    class: SIREN
+    kwargs:
+      hidden_features: 256
+      hidden_layers: 4
+      omega: 30.0
+      output_activation: tanh
+    train: {lr: 5.0e-4}
+
+  Gauss:  # FINER image benchmark
+    class: Gauss
+    kwargs:
+      hidden_features: 256
+      hidden_layers: 4
+      scale: 30.0
+      output_activation: tanh
+    train: {lr: 5.0e-3}
+
+  WIRE:  # FINER image benchmark, real Gabor layer
+    class: RealWIRE
+    kwargs:
+      hidden_features: 256
+      hidden_layers: 4
+      omega: 20.0
+      scale: 10.0
+      output_activation: tanh
+    train: {lr: 3.0e-3}  # deviation: the official 5e-3 diverges for the real Gabor layer
+
+  FINER:  # FINER image benchmark
+    class: FINER
+    kwargs:
+      hidden_features: 256
+      hidden_layers: 4
+      omega: 30.0
+      output_activation: tanh
+    train: {lr: 5.0e-4}
+
+  Instant-NGP:  # instant-ngp configs/image/base.json
+    class: InstantNGP
+    kwargs:
+      num_levels: 19  # deviation: 16 in the reference; 19 meets the budget
+      features_per_level: 2
+      log2_hashmap_size: 13
+      base_resolution: 16
+      max_resolution: max(H, W) // 2
+      hidden_features: 64
+      hidden_layers: 2
+      output_activation: tanh
+    train: {lr: 1.0e-2, adam_betas: [0.9, 0.99], adam_eps: 1.0e-15}
+
+  TensoRF:
+    class: TensoRF
+    kwargs:
+      rank: 176
+      resolution: 256
+      mode: cp
+      hidden_features: 256
+      hidden_layers: 2
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  GA-Planes:
+    class: GAPlanes
+    kwargs:
+      features: 25
+      resolution: [256, 64]
+      hidden_features: 256
+      hidden_layers: 2
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-cosine:
+    class: FUTON
+    kwargs:
+      basis: [cosine, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
+      combiner: [cp, {rank: 224}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 0.1}
+
+  FUTON-sinc:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
+      combiner: [cp, {rank: 224}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-triangle:
+    class: FUTON
+    kwargs:
+      basis: [triangle, {num_components: [H // 2, W // 2]}]
+      combiner: [cp, {rank: 224}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: [H // 2, W // 2], radius: 3}]
+      combiner: [cp, {rank: 224}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 3.0e-2}

@@ -34,7 +34,7 @@ from torch import Tensor, nn
 
 from ..utils import ModuleSpec, build_module
 from .mlp import MLP
-from .rcs_matrix import RCSMatrix
+from .rcs_matrix import RCSMatrix, rcs_product
 
 __all__ = [
     "CosineBasis",
@@ -133,14 +133,17 @@ class _Basis(nn.Module):
             return self._evaluate(x, axis)
         return self._lookup(x, axis, self.grid_size[axis])
 
+    def _features(self, x: Tensor) -> tuple[Tensor, ...]:
+        return tuple(
+            self._axis_features(x[..., axis], axis) for axis in range(self.in_features)
+        )
+
     def forward(self, x: Tensor) -> tuple[Tensor, ...]:
         if x.shape[-1] != self.in_features:
             raise ValueError(
                 f"Expected last dimension {self.in_features}, got {x.shape[-1]}"
             )
-        return tuple(
-            self._axis_features(x[..., axis], axis) for axis in range(self.in_features)
-        )
+        return self._features(x)
 
 
 class CosineBasis(_Basis):
@@ -320,6 +323,10 @@ class _LocalBasis(_Basis):
         self.sparse = bool(sparse)
         if not self.sparse:
             self._build_cache(grid_size)
+        # Sparse mode evaluates every axis at once, with per-axis sizes.
+        sizes = torch.tensor(self.num_components, dtype=torch.float32)
+        self.register_buffer("_sizes", sizes, persistent=False)
+        self.register_buffer("_taps", torch.arange(2.0 * radius), persistent=False)
 
     def _kernel(self, t: Tensor) -> Tensor:
         raise NotImplementedError
@@ -330,21 +337,22 @@ class _LocalBasis(_Basis):
         t = _grid_position(x, size).unsqueeze(-1) - centers
         return self._normalize(self._kernel(t))
 
-    def _evaluate_sparse(self, x: Tensor, axis: int) -> RCSMatrix:
-        """Evaluate the ``2 * radius`` taps around each point as an RCS matrix."""
-        size, num_taps = self.num_components[axis], 2 * self.radius
-        position = _grid_position(x.reshape(-1), size)
+    def _features(self, x: Tensor) -> tuple[Tensor, ...]:
+        if not self.sparse:
+            return super()._features(x)
+        # Evaluate the 2 * radius taps around each point, on every axis at once.
+        position = _grid_position(x.reshape(-1, self.in_features), self._sizes)
         # Clamping keeps each segment inside the basis; taps shifted by the
         # clamp lie outside the kernel support and evaluate to zero.
-        start = (position.floor().long() - (self.radius - 1)).clamp_(0, size - num_taps)
-        offsets = torch.arange(num_taps, device=x.device)
-        t = position.unsqueeze(-1) - (start.unsqueeze(-1) + offsets).to(position.dtype)
-        return RCSMatrix(self._normalize(self._kernel(t)), start, size)
-
-    def _axis_features(self, x: Tensor, axis: int) -> Tensor:
-        if self.sparse:
-            return self._evaluate_sparse(x, axis)
-        return super()._axis_features(x, axis)
+        start = (position.floor() - (self.radius - 1)).clamp_(min=0)
+        start = start.minimum(self._sizes - 2 * self.radius)
+        t = (position - start).unsqueeze(-1) - self._taps
+        values, start = self._normalize(self._kernel(t)), start.long()
+        # The clamp keeps the segments in bounds, so skip the synchronizing check.
+        return tuple(
+            RCSMatrix(values[:, axis], start[:, axis], size, check_invariants=False)
+            for axis, size in enumerate(self.num_components)
+        )
 
 
 class TriangleBasis(_LocalBasis):
@@ -487,7 +495,8 @@ class CPCombiner(_Combiner):
     Projects each axis to ``rank`` channels and multiplies the projections
     elementwise. ``linears[c].weight`` stores the transposed CP factor
     :math:`\mathbf{U}^{(c)\top}` of shape ``(rank, K_c)`` (FUTON paper,
-    Eqs. 10–11). RCS features are projected without densifying.
+    Eqs. 10–11). RCS features are projected without densifying, and without
+    bias, one fused :func:`rcs_product` computes the whole combination.
 
     Args:
         in_features: Feature width ``K_c`` of each axis.
@@ -521,6 +530,10 @@ class CPCombiner(_Combiner):
                 nn.init.zeros_(linear.bias)
 
     def forward(self, features: Sequence[Tensor]) -> Tensor:
+        if self.linears[0].bias is None and all(
+            isinstance(feature, RCSMatrix) for feature in features
+        ):
+            return rcs_product(features, [linear.weight.T for linear in self.linears])
         projections = (
             _project(feature, linear) for feature, linear in zip(features, self.linears)
         )

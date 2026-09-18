@@ -248,7 +248,13 @@ class TestCombiners:
         combiner = combiner_cls([K] * C, rank=8).to(device)
         dense = LanczosBasis(C, K, radius=2, sparse=False).to(device)(x)
         sparse = LanczosBasis(C, K, radius=2, sparse=True).to(device)(x)
-        assert torch.allclose(combiner(sparse), combiner(dense), atol=1e-5)
+        out, ref = combiner(sparse), combiner(dense)
+        assert torch.allclose(out, ref, atol=1e-5)
+        grad = torch.randn_like(out)
+        params = list(combiner.parameters())
+        grads = torch.autograd.grad(out, params, grad)
+        for got, expected in zip(grads, torch.autograd.grad(ref, params, grad)):
+            assert torch.allclose(got, expected, atol=1e-4)
 
     @pytest.mark.parametrize("device", DEVICES)
     def test_hadamard_densifies(self, device):

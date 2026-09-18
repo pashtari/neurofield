@@ -6,11 +6,11 @@ with the model setup, parameter count, training time, final metrics, and
 training history. Finished runs are skipped, so an interrupted sweep resumes
 where it stopped; ``--overwrite`` reruns them instead.
 
-For an ablation, layer a config that holds only what changes over the task's
-config and give the variants their own names, so that they do not collide with
-the defaults, or send them to another ``--log-dir``::
+Runs are keyed by model name, so give variants their own names or their own
+``--log-dir``. Several configs are merged in order, and ``--set`` overrides a
+single value::
 
-    --config configs/image.yaml configs/ablation.yaml
+    --config configs/ablation_futon.yaml --log-dir logs/ablation-futon
     --set models.FUTON-sinc.train.lr=0.05
 
 To collect results::
@@ -47,6 +47,14 @@ def build(model: dict[str, Any]) -> tuple[type[torch.nn.Module], dict[str, Any]]
     if "output_activation" in kwargs:
         kwargs["output_activation"] = getattr(torch, kwargs["output_activation"])
     return getattr(nf, model["class"]), kwargs
+
+
+def relative(path: Path) -> str:
+    """A path inside the repository as a repository-relative one."""
+    resolved = path.resolve()
+    return str(
+        resolved.relative_to(ROOT) if resolved.is_relative_to(ROOT) else resolved
+    )
 
 
 def merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -178,7 +186,8 @@ def run(
                 "data": path.stem,
                 "model": name,
                 "train_time": result["history"][-1]["elapsed"],
-                "config": [str(path) for path in args.config] + args.settings,
+                # Relative to the repository, so a report reads them anywhere.
+                "config": [relative(path) for path in args.config] + args.settings,
             }
             text = json.dumps(result, indent=2, default=str)
             (out / "results.json").write_text(text + "\n")

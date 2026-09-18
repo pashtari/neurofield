@@ -64,7 +64,9 @@ models:
       hidden_layers: 4
       scale: 30.0
       output_activation: tanh
-    train: {lr: 5.0e-3}
+    # deviation: the published 5e-3 is unstable here, losing 6-9 dB on some
+    # images; 1e-3, as in the occupancy benchmark, is stable and 3.5 dB better.
+    train: {lr: 1.0e-3}
 
   WIRE:  # FINER image benchmark, real Gabor layer
     class: RealWIRE
@@ -132,15 +134,6 @@ models:
     class: FUTON
     kwargs:
       basis: [sinc, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
-      combiner: [cp, {rank: 224}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 3.0e-2}
-
-  FUTON-triangle:
-    class: FUTON
-    kwargs:
-      basis: [triangle, {num_components: [H // 2, W // 2]}]
       combiner: [cp, {rank: 224}]
       decoder: [mlp, {hidden_layers: 1}]
       output_activation: tanh

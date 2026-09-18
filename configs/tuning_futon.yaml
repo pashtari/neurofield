@@ -116,61 +116,6 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-2}
 
-  # R = K.
-  FUTON-cosine-K181-R181:
-    class: FUTON
-    kwargs:
-      basis: [cosine, {num_components: 181, grid_size: 256}]
-      combiner: [cp, {rank: 181}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-cosine-linear-K209-R209:
-    class: FUTON
-    kwargs:
-      basis: [cosine, {num_components: 209, grid_size: 256}]
-      combiner: [cp, {rank: 209}]
-      decoder: linear
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-lanczos-K181-R181:
-    class: FUTON
-    kwargs:
-      basis: [lanczos, {num_components: 181, radius: 3}]
-      combiner: [cp, {rank: 181}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-lanczos-linear-K209-R209:
-    class: FUTON
-    kwargs:
-      basis: [lanczos, {num_components: 209, radius: 3}]
-      combiner: [cp, {rank: 209}]
-      decoder: linear
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-sinc-K181-R181:
-    class: FUTON
-    kwargs:
-      basis: [sinc, {num_components: 181, grid_size: 256}]
-      combiner: [cp, {rank: 181}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-sinc-linear-K209-R209:
-    class: FUTON
-    kwargs:
-      basis: [sinc, {num_components: 209, grid_size: 256}]
-      combiner: [cp, {rank: 209}]
-      decoder: linear
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
   # The decoder, with the rank raised to keep the size.
   FUTON-sinc-linear:
     class: FUTON

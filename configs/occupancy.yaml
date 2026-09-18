@@ -1,8 +1,8 @@
 # Occupancy volume representation: fit each model to one Stanford shape.
 #
-# The FUTON entries spend their budget on the combiner rather than a decoder
-# MLP: at this size a linear decoder with rank 342 beats rank 144 with one
-# hidden layer by about 0.15 IoU points (configs/tuning_futon.yaml).
+# The FUTON entries use K = 128 components and CP rank 218 (131,673
+# parameters), which at this size beats K = 256, R = 144 by about 0.1 IoU
+# points for each basis (configs/tuning_futon.yaml).
 #
 # Each model has a neurofield class, its constructor arguments, and training
 # arguments that override the shared ones. "deviation" marks a departure from
@@ -96,7 +96,9 @@ models:
       log2_hashmap_size: 12
       base_resolution: 16
       max_resolution: 256  # the grid resolution
-      hidden_features: 64
+      # The hash tables alone hold 131,072 parameters, so the MLP is narrowed
+      # from 64 to 24 to match the other models (132,440 in all).
+      hidden_features: 24
       hidden_layers: 2
       output_activation: tanh
     # deviation: the volume lr 1e-4 (tuned for long schedules) loses 9 IoU
@@ -117,8 +119,11 @@ models:
   TensoRF-VM:
     class: TensoRF
     kwargs:
-      rank: 33
-      resolution: 32
+      # A VM plane costs resolution^2 parameters per rank, so at this size
+      # resolution beats rank: 96 with rank 4 reaches 99.74 IoU, against 99.40
+      # for 32 with rank 33 and 98.83 for 16 with rank 97.
+      rank: 4
+      resolution: 96
       mode: vm
       hidden_features: 128
       hidden_layers: 2
@@ -139,8 +144,8 @@ models:
     class: FUTON
     kwargs:
       basis: [cosine, {num_components: 128, grid_size: 256}]
-      combiner: [cp, {rank: 342}]
-      decoder: linear
+      combiner: [cp, {rank: 218}]
+      decoder: [mlp, {hidden_layers: 1}]
       output_activation: tanh
     train: {lr: 1.0e-2}
 
@@ -148,8 +153,8 @@ models:
     class: FUTON
     kwargs:
       basis: [sinc, {num_components: 128, grid_size: 256}]
-      combiner: [cp, {rank: 342}]
-      decoder: linear
+      combiner: [cp, {rank: 218}]
+      decoder: [mlp, {hidden_layers: 1}]
       output_activation: tanh
     train: {lr: 1.0e-2}
 
@@ -157,7 +162,7 @@ models:
     class: FUTON
     kwargs:
       basis: [lanczos, {num_components: 128, radius: 3}]
-      combiner: [cp, {rank: 342}]
-      decoder: linear
+      combiner: [cp, {rank: 218}]
+      decoder: [mlp, {hidden_layers: 1}]
       output_activation: tanh
     train: {lr: 1.0e-2}

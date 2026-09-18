@@ -6,11 +6,12 @@ Usage:
     python scripts/report_ablation.py --log-dir logs/ablation-futon
 
 Writes results/ablation-futon/, one folder per study:
-    basis/            the bases at the reference size (K=256, R=144)
+    basis/            the bases at the default size (K=128, R=218)
     components_rank/  IoU against rank R at each K, and against K at each R
-    tensor_net/       CP against tensor-ring combiners of equal size at K=256
+    tensor_net/       the default CP combiner against a tensor ring, per basis
 Each folder holds a summary table and plots; bands and bars are one standard
-error of the mean over the shapes.
+error of the mean over the shapes. Only runs whose setup matches
+configs/ablation_futon.yaml count, so runs of since-changed entries drop out.
 
 Meshes of the ablation runs come from the occupancy report, e.g.
     python scripts/report_occupancy.py --log-dir logs/ablation-futon \
@@ -20,6 +21,8 @@ Meshes of the ablation runs come from the occupancy report, e.g.
 import re
 from pathlib import Path
 
+import yaml
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import pandas as pd
@@ -28,9 +31,10 @@ import seaborn as sns
 import report_common as report
 
 METRICS = ("iou",)
+CONFIG = report.ROOT / "configs" / "ablation_futon.yaml"
 GRID = re.compile(r"FUTON-(?P<basis>\w+)-K(?P<components>\d+)-R(?P<rank>\d+)$")
-RING = re.compile(r"FUTON-(?P<basis>\w+)-TR-K(?P<components>\d+)-R(?P<rank>\d+)$")
-REFERENCE = re.compile(r"FUTON-(?P<basis>\w+)$")
+RING = re.compile(r"FUTON-(?P<basis>\w+)-TR$")
+DEFAULT = re.compile(r"FUTON-(?P<basis>\w+)$")
 
 
 def label(pattern: re.Pattern, data: pd.DataFrame) -> pd.DataFrame:
@@ -78,43 +82,6 @@ def grid_plots(data: pd.DataFrame, metric: str, out_dir: Path) -> None:
             report.save(figure, out_dir / f"{metric}_vs_{x}_{basis}")
 
 
-def size_plots(data: pd.DataFrame, metric: str, out_dir: Path) -> None:
-    """IoU against model size for the CP and tensor-ring combiners, per basis."""
-    data = data.assign(
-        combiner=data["model"].str.contains("-TR-").map({True: "TR", False: "CP"}),
-        basis=data["model"].str.extract(r"FUTON-(\w+)")[0],
-    )
-    for basis, rows in data.groupby("basis"):
-        figure, plot = plt.subplots(figsize=(3.6, 3.0))
-        sns.lineplot(
-            data=rows,
-            x="parameters",
-            y=metric,
-            hue="combiner",
-            style="combiner",
-            markers=True,
-            dashes=False,
-            errorbar="se",
-            palette=list(report.PALETTE[:2]),
-            markersize=5,
-            markeredgecolor="white",
-            markeredgewidth=0.5,
-            ax=plot,
-        )
-        plot.set(
-            xlabel="Parameters (k)",
-            ylabel=report.METRICS[metric][0],
-            title=f"FUTON-{basis}, K = 256",
-        )
-        # The sizes roughly double, so tick them on a log axis.
-        sizes = sorted(rows["parameters"].unique())
-        plot.set_xscale("log")
-        plot.set_xticks(sizes, [f"{size:.0f}" for size in sizes])
-        plot.xaxis.set_minor_locator(ticker.NullLocator())
-        plot.legend(title="Combiner", frameon=False)
-        report.save(figure, out_dir / f"{metric}_vs_size_{basis}")
-
-
 def study(
     runs: list[dict], models: list[str], metrics, out_dir: Path, plots: bool = True
 ) -> pd.DataFrame:
@@ -133,39 +100,44 @@ def main() -> None:
     parser = report.parser("ablation-futon", "ablation-futon", "lucy")
     args = parser.parse_args()
 
-    runs = report.read(args.log_dir, "occupancy", args.models)
+    models = yaml.safe_load(CONFIG.read_text())["models"]
+    runs = [
+        run
+        for run in report.read(args.log_dir, "occupancy", args.models)
+        if models.get(run["model"]) == run["setup"]
+    ]
     data = report.results(runs)
     report.style()
     metric = METRICS[0]
 
-    # Rank and components: a grid, so curves against R and against K.
+    # Components and rank: a grid, so curves against R and against K.
     grid = label(GRID, data)
     grid_plots(grid, metric, args.out_dir / "components_rank")
     report.table(
         grid, METRICS, args.out_dir / "components_rank", report.SPEED["occupancy"]
     )
-    print(f"rank x components: {grid['model'].nunique()} models")
+    print(f"components x rank: {grid['model'].nunique()} models")
 
-    # CP against tensor ring at K=256. A ring of rank r has the size of a CP
-    # combiner of rank r^2; CP rank 144 is the reference model itself.
+    # The default CP combiner against a tensor ring at the same K, per basis.
     rings = label(RING, data)
-    partners = {
-        f"FUTON-{basis}-K256-R{rank ** 2}" if rank**2 != 144 else f"FUTON-{basis}"
-        for basis, rank in zip(rings["basis"], rings["rank"])
-    }
-    networks = sorted(set(rings["model"]) | (partners & set(data["model"])))
-    study(runs, networks, METRICS, args.out_dir / "tensor_net", plots=False)
+    pairs = sorted(set(rings["model"]) | {f"FUTON-{b}" for b in rings["basis"]})
+    study(runs, pairs, METRICS, args.out_dir / "tensor_net", plots=False)
     for basis in sorted(rings["basis"].unique()):
-        chosen = [m for m in networks if m.startswith(f"FUTON-{basis}")]
-        curves = report.curves([run for run in runs if run["model"] in chosen])
+        chosen = [
+            run
+            for run in runs
+            if run["model"] in (f"FUTON-{basis}", f"FUTON-{basis}-TR")
+        ]
         report.convergence(
-            curves, METRICS, args.out_dir / "tensor_net" / basis, time_limit=15
+            report.curves(chosen),
+            METRICS,
+            args.out_dir / "tensor_net" / basis,
+            time_limit=15,
         )
-    size_plots(data[data["model"].isin(networks)], metric, args.out_dir / "tensor_net")
-    print(f"tensor network: {len(networks)} models")
+    print(f"tensor network: {len(pairs)} models")
 
-    # Bases at the reference size.
-    bases = sorted(set(label(REFERENCE, data)["model"]))
+    # Bases at the default size.
+    bases = sorted(set(label(DEFAULT, data)["model"]))
     study(runs, bases, METRICS, args.out_dir / "basis")
     print(f"basis: {len(bases)} models")
 

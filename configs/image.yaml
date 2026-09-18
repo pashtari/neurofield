@@ -64,7 +64,9 @@ models:
       hidden_layers: 4
       scale: 30.0
       output_activation: tanh
-    train: {lr: 5.0e-3}
+    # deviation: the published 5e-3 is unstable here, losing 6-9 dB on some
+    # images; 1e-3, as in the occupancy benchmark, is stable and 3.5 dB better.
+    train: {lr: 1.0e-3}
 
   WIRE:  # FINER image benchmark, real Gabor layer
     class: RealWIRE

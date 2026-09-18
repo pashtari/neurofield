@@ -108,7 +108,7 @@ models:
       hidden_features: 128
       hidden_layers: 2
       output_activation: tanh
-    train: {lr: 3.0e-2}
+    train: {lr: 1.0e-2}  # 3e-2, as for the VM mode, diverges on three shapes
 
   TensoRF-VM:
     class: TensoRF

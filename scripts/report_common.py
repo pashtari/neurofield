@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pgf import LatexError
 import pandas as pd
 import seaborn as sns
 import torch
@@ -43,7 +44,7 @@ PALETTE = (
     "#4a3aa7",
     "#e34948",
 )
-STYLES = ("-", "--", ":")
+DASHES = ("", (4, 2), (1, 1.5))  # solid, dashed, dotted
 RAMP = ("#9ec5f4", "#5598e7", "#2a78d6", "#184f95", "#0d366b")
 
 SIGNALS = {  # where a run's signal lives, by task
@@ -161,7 +162,7 @@ def save(figure: plt.Figure, path: Path) -> None:
     figure.savefig(path.with_suffix(".pdf"), bbox_inches="tight")
     try:
         figure.savefig(path.with_suffix(".pgf"), bbox_inches="tight")
-    except (RuntimeError, FileNotFoundError) as error:  # PGF needs LaTeX
+    except (RuntimeError, FileNotFoundError, LatexError) as error:  # PGF runs LaTeX
         warnings.warn(f"no {path.name}.pgf: {error}")
     plt.close(figure)
 
@@ -200,58 +201,26 @@ def table(
     header levels; Markdown, which has no multi-column header, joins them.
     """
     models = order(data, metrics[0])
-    signals = sorted(data["signal"].unique())
     grouped = data.groupby("model")
+    mean = grouped.mean(numeric_only=True).loc[models]
+    std = grouped.std(numeric_only=True).loc[models]
 
-    columns: list[tuple[str, str]] = []
-    cells: dict[str, list[str]] = {model: [] for model in models}
-
-    def add(column: tuple[str, str], values: dict[str, str]) -> None:
-        columns.append(column)
-        for model in models:
-            cells[model].append(values.get(model, ""))
-
-    add(
-        ("", "# Params (k) \u2193"),
-        {m: f"{grouped.get_group(m)['parameters'].iloc[0]:.1f}" for m in models},
-    )
-    add(
-        ("", "Time (s) \u2193"),
-        {m: f"{grouped.get_group(m)['time'].mean():.1f}" for m in models},
-    )
-    add(
-        ("", f"Speed ({speed}) \u2191"),
-        {m: f"{grouped.get_group(m)['speed'].mean():.1f}" for m in models},
-    )
+    columns = {
+        ("", "# Params (k) \u2193"): mean["parameters"].map("{:.1f}".format),
+        ("", "Time (s) \u2193"): mean["time"].map("{:.1f}".format),
+        ("", f"Speed ({speed}) \u2191"): mean["speed"].map("{:.1f}".format),
+    }
     for metric in metrics:  # averaged over the signals, so unlabelled
-        add(
-            ("", header(metric)),
-            {
-                m: entry(
-                    metric,
-                    grouped.get_group(m)[metric].mean(),
-                    grouped.get_group(m)[metric].std(),
-                )
-                for m in models
-            },
+        columns[("", header(metric))] = pd.Series(
+            {m: entry(metric, mean[metric][m], std[metric][m]) for m in models}
         )
-    for signal in signals if per_signal else ():
-        values = data[data["signal"] == signal].set_index("model")
+    for signal, rows in data.groupby("signal") if per_signal else ():
+        values = rows.set_index("model")
         for metric in metrics:
-            add(
-                (signal, header(metric)),
-                {
-                    m: entry(metric, values[metric][m])
-                    for m in models
-                    if m in values.index
-                },
+            columns[(signal, header(metric))] = values[metric].map(
+                lambda value, metric=metric: entry(metric, value)
             )
-
-    summary = pd.DataFrame(
-        [cells[model] for model in models],
-        index=pd.Index(models),
-        columns=pd.MultiIndex.from_tuples(columns),
-    )
+    summary = pd.DataFrame(columns).loc[models].fillna("")
     out_dir.mkdir(parents=True, exist_ok=True)
     summary.to_csv(out_dir / f"{name}.csv", index_label="Model")
     (out_dir / f"{name}.md").write_text(markdown(summary))
@@ -271,24 +240,25 @@ def table(
     return summary
 
 
-def within_signal_error(data: pd.DataFrame, metric: str) -> pd.Series:
-    """Standard error of each model's mean, with the signal effect removed.
+def y_range(
+    means: pd.DataFrame, axis: str, larger_is_better: bool
+) -> tuple[float, float]:
+    """A range on which the models separate, from their mean curves.
 
-    Every model is measured on the same signals, so their differing difficulty
-    inflates a plain standard error without telling the models apart. Centring
-    each signal on the average of the models removes that shared effect; the
-    Morey factor corrects for the degree of freedom it costs.
+    Early transients and a diverged model would each squeeze the rest together,
+    so the weak end is trimmed to the tenth percentile of the second half of
+    the run, then widened to every final value but a collapsed one.
     """
-    errors = {}
-    for iteration, block in data.groupby("iteration"):
-        values = block.pivot_table(index="signal", columns="model", values=metric)
-        signals, models = values.shape
-        centred = values.sub(values.mean(axis=1), axis=0)
-        correction = (models / (models - 1)) ** 0.5 if models > 1 else 1.0
-        errors[iteration] = centred.std(ddof=1) / signals**0.5 * correction
-    return pd.concat(errors, names=["iteration", "model"]).reorder_levels(
-        ["model", "iteration"]
-    )
+    converged = means[means[axis] >= means[axis].median()]["mean"]
+    finals = means.groupby("model")["mean"].last()
+    if larger_is_better:
+        finals = finals[finals >= 0.5 * finals.max()]
+        low, high = min(converged.quantile(0.10), finals.min()), means["mean"].max()
+    else:
+        finals = finals[finals <= 5 * finals.min()]
+        low, high = means["mean"].min(), max(converged.quantile(0.90), finals.max())
+    margin = 0.05 * (high - low)
+    return low - margin, high + margin
 
 
 def convergence(
@@ -300,71 +270,46 @@ def convergence(
 ) -> None:
     """Plot each metric against iteration and against time, averaged over signals.
 
-    The band is a within-signal standard error: every model is measured on
-    the same signals, so the spread between signals (a hard scene against an
-    easy one) is common to all of them and says nothing about which model is
-    better. Centring each signal on the average of the models removes it and
-    leaves the variation that does separate them (Cousineau-Morey). The lines
-    are drawn from the per-iteration mean rather than by seaborn's own
-    aggregation, because the elapsed time differs between signals.
-    ``time_limit``
-    crops the time axis, where the slowest models would otherwise set a scale
-    on which the rest finish immediately.
+    The band is one standard error of the mean over the signals. Each
+    evaluation is placed at the elapsed time averaged over signals, so that
+    seaborn groups the signals of an evaluation together. ``time_limit`` crops
+    the time axis, where the slowest models would squeeze the rest.
     """
-    models = models or order(data, metrics[0])
-    lines = {
-        model: (PALETTE[index % len(PALETTE)], STYLES[index // len(PALETTE)])
-        for index, model in enumerate(models)
-    }
+    models = list(models or order(data, metrics[0]))
+    palette = {m: PALETTE[i % len(PALETTE)] for i, m in enumerate(models)}
+    dashes = {m: DASHES[i // len(PALETTE)] for i, m in enumerate(models)}
+    data = data.assign(
+        time=data.groupby(["model", "iteration"])["time"].transform("mean")
+    )
+
     for metric in metrics:
-        grouped = data.groupby(["model", "iteration"]).agg(
-            time=("time", "mean"), mean=(metric, "mean")
-        )
-        grouped["sd"] = within_signal_error(data, metric)
         for axis, label in (("iteration", "Iteration"), ("time", "Time (s)")):
             figure, plot = plt.subplots()
-            for model in models:
-                line = grouped.loc[model].reset_index()
-                x = line["iteration"] if axis == "iteration" else line["time"]
-                color, style = lines[model]
-                plot.plot(x, line["mean"], label=model, color=color, linestyle=style)
-                if line["sd"].notna().any():
-                    plot.fill_between(
-                        x,
-                        line["mean"] - line["sd"],
-                        line["mean"] + line["sd"],
-                        color=color,
-                        alpha=0.15,
-                        linewidth=0,
-                    )
+            sns.lineplot(
+                data=data,
+                x=axis,
+                y=metric,
+                hue="model",
+                hue_order=models,
+                palette=palette,
+                style="model",
+                dashes=dashes,
+                errorbar=("se", 1),
+                err_kws={"alpha": 0.1, "linewidth": 0},
+                ax=plot,
+            )
             plot.set(xlabel=label, ylabel=METRICS[metric][0])
+            means = data.groupby(["model", "iteration"], as_index=False)[
+                [axis, metric]
+            ].mean()
+            means = means.rename(columns={metric: "mean"})
             if axis == "time":
                 plot.set_xlim(0, time_limit)
+                if time_limit:
+                    means = means[means["time"] <= time_limit]
+            plot.set_ylim(*y_range(means, axis, METRICS[metric][1]))
 
-            # Bands, early transients and a diverged model each set a range
-            # on which the rest sit on top of each other. So keep the best end
-            # and trim the weak one to the tenth percentile of the second half
-            # of the run, where the models have converged and separate, then
-            # widen it to every model's final value -- except a collapsed one,
-            # which would undo the trimming.
-            shown = grouped.reset_index()
-            if axis == "time" and time_limit:
-                shown = shown[shown[axis] <= time_limit]
-            converged = shown[shown[axis] >= shown[axis].median()]["mean"]
-            finals = shown.groupby("model")["mean"].last()
-            if METRICS[metric][1]:
-                finals = finals[finals >= 0.5 * finals.max()]
-                low = min(converged.quantile(0.10), finals.min())
-                high = shown["mean"].max()
-            else:
-                finals = finals[finals <= 5 * finals.min()]
-                low = shown["mean"].min()
-                high = max(converged.quantile(0.90), finals.max())
-            margin = 0.05 * (high - low)
-            plot.set_ylim(low - margin, high + margin)
-
-            # Worst at the top, best at the bottom, wherever the curves leave
-            # the most room.
+            # Worst at the top, best at the bottom, where the curves leave room.
             handles, labels = plot.get_legend_handles_labels()
             plot.legend(
                 handles[::-1],
@@ -429,15 +374,13 @@ def examples(
 
 def montage(panels: Sequence[tuple[str, Path]], path: Path, columns: int = 5) -> None:
     """Lay saved images out as one figure, for a paper's qualitative row."""
-    import matplotlib.image as mpimg
-
     rows = -(-len(panels) // columns)
-    width, height = plt.rcParams["figure.figsize"]
+    width = plt.rcParams["figure.figsize"][0]
     figure, axes = plt.subplots(
         rows, columns, figsize=(width, width / columns * rows * 1.15), squeeze=False
     )
     for axis, (label, image) in zip(axes.ravel(), panels):
-        axis.imshow(mpimg.imread(image))
+        axis.imshow(plt.imread(image))
         axis.set_title(label, fontsize=7, pad=2)
     for axis in axes.ravel():
         axis.set_axis_off()

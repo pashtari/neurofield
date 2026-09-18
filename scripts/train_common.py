@@ -6,11 +6,11 @@ with the model setup, parameter count, training time, final metrics, and
 training history. Finished runs are skipped, so an interrupted sweep resumes
 where it stopped; ``--overwrite`` reruns them instead.
 
-For an ablation, layer a config that holds only what changes over the task's
-config and give the variants their own names, so that they do not collide with
-the defaults, or send them to another ``--log-dir``::
+Runs are keyed by model name, so give variants their own names or their own
+``--log-dir``. Several configs are merged in order, and ``--set`` overrides a
+single value::
 
-    --config configs/image.yaml configs/ablation.yaml
+    --config configs/ablation_futon.yaml --log-dir logs/ablation-futon
     --set models.FUTON-sinc.train.lr=0.05
 
 To collect results::

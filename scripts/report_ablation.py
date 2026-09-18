@@ -6,11 +6,11 @@ Usage:
     python scripts/report_ablation.py --log-dir logs/ablation-futon
 
 Writes results/ablation-futon/, one folder per study:
+    basis/            the bases at the reference size (K=256, R=144)
     components_rank/  IoU against rank R at each K, and against K at each R
-    tensor_net/       the tensor-ring against the CP combiners of equal size
-    basis/            the bases at the reference size
-Each folder holds summary tables and, except for the grid, convergence plots.
-Bands and bars are the standard error of the mean over the shapes.
+    tensor_net/       CP against tensor-ring combiners of equal size at K=256
+Each folder holds a summary table and plots; bands and bars are one standard
+error of the mean over the shapes.
 
 Meshes of the ablation runs come from the occupancy report, e.g.
     python scripts/report_occupancy.py --log-dir logs/ablation-futon \
@@ -78,6 +78,43 @@ def grid_plots(data: pd.DataFrame, metric: str, out_dir: Path) -> None:
             report.save(figure, out_dir / f"{metric}_vs_{x}_{basis}")
 
 
+def size_plots(data: pd.DataFrame, metric: str, out_dir: Path) -> None:
+    """IoU against model size for the CP and tensor-ring combiners, per basis."""
+    data = data.assign(
+        combiner=data["model"].str.contains("-TR-").map({True: "TR", False: "CP"}),
+        basis=data["model"].str.extract(r"FUTON-(\w+)")[0],
+    )
+    for basis, rows in data.groupby("basis"):
+        figure, plot = plt.subplots(figsize=(3.6, 3.0))
+        sns.lineplot(
+            data=rows,
+            x="parameters",
+            y=metric,
+            hue="combiner",
+            style="combiner",
+            markers=True,
+            dashes=False,
+            errorbar="se",
+            palette=list(report.PALETTE[:2]),
+            markersize=5,
+            markeredgecolor="white",
+            markeredgewidth=0.5,
+            ax=plot,
+        )
+        plot.set(
+            xlabel="Parameters (k)",
+            ylabel=report.METRICS[metric][0],
+            title=f"FUTON-{basis}, K = 256",
+        )
+        # The sizes roughly double, so tick them on a log axis.
+        sizes = sorted(rows["parameters"].unique())
+        plot.set_xscale("log")
+        plot.set_xticks(sizes, [f"{size:.0f}" for size in sizes])
+        plot.xaxis.set_minor_locator(ticker.NullLocator())
+        plot.legend(title="Combiner", frameon=False)
+        report.save(figure, out_dir / f"{metric}_vs_size_{basis}")
+
+
 def study(
     runs: list[dict], models: list[str], metrics, out_dir: Path, plots: bool = True
 ) -> pd.DataFrame:
@@ -109,23 +146,23 @@ def main() -> None:
     )
     print(f"rank x components: {grid['model'].nunique()} models")
 
-    # Tensor ring against the CP combiners of the same size.
+    # CP against tensor ring at K=256. A ring of rank r has the size of a CP
+    # combiner of rank r^2; CP rank 144 is the reference model itself.
     rings = label(RING, data)
-    pairs = sorted(
-        set(rings["model"])
-        | {f"FUTON-{basis}" for basis in rings["basis"]}  # CP R=144, matching TR r=12
-        | {
-            f"FUTON-{row.basis}-K{row.components}-R{row.rank ** 2}"
-            for row in rings.itertuples()
-        }
-    )
-    study(
-        runs,
-        [name for name in pairs if name in set(data["model"])],
-        METRICS,
-        args.out_dir / "tensor_net",
-    )
-    print(f"tensor ring: {len(pairs)} models")
+    partners = {
+        f"FUTON-{basis}-K256-R{rank ** 2}" if rank**2 != 144 else f"FUTON-{basis}"
+        for basis, rank in zip(rings["basis"], rings["rank"])
+    }
+    networks = sorted(set(rings["model"]) | (partners & set(data["model"])))
+    study(runs, networks, METRICS, args.out_dir / "tensor_net", plots=False)
+    for basis in sorted(rings["basis"].unique()):
+        chosen = [m for m in networks if m.startswith(f"FUTON-{basis}")]
+        curves = report.curves([run for run in runs if run["model"] in chosen])
+        report.convergence(
+            curves, METRICS, args.out_dir / "tensor_net" / basis, time_limit=15
+        )
+    size_plots(data[data["model"].isin(networks)], metric, args.out_dir / "tensor_net")
+    print(f"tensor network: {len(networks)} models")
 
     # Bases at the reference size.
     bases = sorted(set(label(REFERENCE, data)["model"]))

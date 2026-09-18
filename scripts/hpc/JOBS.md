@@ -25,53 +25,43 @@ done
 
 ## FUTON ablations
 
-`configs/ablation_futon.yaml` holds 41 models on the occupancy task, which is
-the cheapest of the three and the most sensitive to the basis. They all share
+`configs/ablation_futon.yaml` holds 63 models on the occupancy task, all with
 the benchmark's settings (256^3 grid, 2000 epochs, lr 1e-2), so only the model
-changes. 41 models x 5 shapes = 205 runs, about 1.5 hours in total:
+changes. The reference is K=256 components, CP rank 144 and a one-layer MLP
+decoder (131,617 parameters). 63 models x 5 shapes = 315 runs, about two hours:
 
 ```bash
-scripts/hpc/train.sh --clusters=accelgor --time=3:00:00 occupancy \
+scripts/hpc/train.sh --clusters=accelgor --time=4:00:00 occupancy \
   --config configs/ablation_futon.yaml --log-dir logs/ablation-futon
 ```
 
-The runs land in `logs/ablation-futon/<shape>/<model>/`, separate from the
-benchmark, and cover three questions:
-
 | Study | Models | What varies |
 | --- | --- | --- |
-| Reference | `FUTON-cosine`, `FUTON-sinc` | the benchmark entries, repeated (K=256, R=144, 131,617 parameters) |
-| Rank and components | `FUTON-<basis>-K<K>-R<R>`, 32 models | K and R over {64, 128, 256, 512} for both bases (16,513 to 1,049,601 parameters) |
-| Tensor ring | `FUTON-<basis>-TR-K256-R<r>`, 4 models | a TR combiner in place of CP, r = 12 and 16 |
-| Basis | `FUTON-triangle`, `FUTON-chebyshev`, `FUTON-legendre` | three more bases at the reference size |
+| Basis | `FUTON-<basis>` | cosine, lanczos, sinc, triangle, chebyshev and legendre at the reference size |
+| Components and rank | `FUTON-<basis>-K<K>-R<R>`, 48 models | K and R over {64, 128, 256, 512}, for cosine, lanczos and sinc |
+| Tensor network | `FUTON-<basis>-TR-K256-R<r>`, 9 models | a tensor-ring combiner of rank 8, 12 or 16 against CP at K=256 |
 
-A TR combiner of rank `r` has exactly the parameter count of a CP combiner of
-rank `r^2`, so `TR-K256-R12` pairs with the reference `R=144` and
-`TR-K256-R16` with `K256-R256`, each at equal size.
-
-To run one study alone, add `--models`, e.g.
-`--models FUTON-chebyshev FUTON-legendre`. To split the sweep over several
-GPUs, give each job its own shapes with `--data`.
+A tensor ring of rank `r` has exactly the size of a CP combiner of rank `r^2`,
+so the tensor-network study pairs TR `r` = 8, 12, 16 with CP `R` = 64, 144, 256.
 
 ## Tuning
 
-`configs/tuning_futon.yaml` holds 22 FUTON variants of the benchmark's size
+`configs/tuning_futon.yaml` holds 35 FUTON variants of the benchmark's size
 (about 131,600 parameters each), so a gain is a better use of the same budget:
-components against rank at fixed size, three decoders, two learning rates, the
-basis normalization, a combiner bias, and the other bases. 22 models x 5
-shapes = 110 runs, about an hour:
+K against R, R = K, three decoders, the learning rate, basis normalization, a
+combiner bias, and the other bases. 35 models x 5 shapes = 175 runs:
 
 ```bash
 scripts/hpc/train.sh --clusters=accelgor --time=3:00:00 occupancy \
   --config configs/tuning_futon.yaml --log-dir logs/tuning-futon
 ```
 
-To retune one baseline, override its rate and send the runs elsewhere:
+To retune one baseline, override a value and send the runs elsewhere:
 
 ```bash
 scripts/hpc/train.sh --clusters=accelgor --time=2:00:00 nerf \
   --models SIREN FINER --data data/nerf/blender/lego \
-  --set models.SIREN.train.lr=3.0e-3 --log-dir logs/tune-nerf/lr3e-3
+  --set models.SIREN.train.lr=2.0e-4 --log-dir logs/tune-nerf/lr2e-4
 ```
 
 A config change to a model that has already run needs `--overwrite`, which

@@ -154,16 +154,16 @@ python scripts/train_nerf.py        # Blender scenes     -> logs/nerf/<scene>/<m
 
 The YAML configs hold the shared data and training settings and, per model, its `neurofield` class, constructor arguments, and training overrides (e.g. the learning rate). Image configs may use size expressions in the image height `H` and width `W`, such as `max(H, W) // 2`.
 
-For an ablation, layer a config holding only what changes, and give the variants their own names so they do not collide with the defaults; `--set` overrides single values, and `--overwrite` reruns finished runs instead of skipping them:
+Runs are keyed by model name, so an ablation gives its variants their own names or its own `--log-dir`. `configs/ablation_futon.yaml` and `configs/tuning_futon.yaml` hold the FUTON ablations and tuning on the occupancy task. `--set` overrides a single value, and `--overwrite` reruns finished runs instead of skipping them:
 
 ```bash
-python scripts/train_image.py --config configs/image.yaml configs/ablation.yaml
+python scripts/train_occupancy.py --config configs/ablation_futon.yaml --log-dir logs/ablation-futon
 python scripts/train_image.py --set models.SIREN.train.lr=0.001 --log-dir logs/ablation-lr
 ```
 
 Each run directory holds `log.txt`, `log.json`, `checkpoint.pt`, the final reconstruction (NeRF: selected test views), and `results.json` with the model setup, parameter count, training time, final metrics (NeRF: all 200 test views), and training history.
 
-`scripts/report_<task>.py` turns those runs into `results/<task>/`: one table (CSV, Markdown, LaTeX) of every model, opening with its size, times and each metric averaged over the signals as `mean±std`, followed by one super column per signal holding that signal's metrics; convergence plots of each metric against iteration and against time, averaged over signals with a within-signal standard-error band, written as PDF and as PGF to include in a LaTeX document; and qualitative examples rebuilt from the checkpoints — reconstructed images, meshes and renders, or novel views and an orbit GIF, each named by rank, model and score, and composed into one `comparison.pdf`. `scripts/report_ablation.py` does the same for the FUTON ablations, plus the components and rank grid.
+`scripts/report_<task>.py` turns those runs into `results/<task>/`: one table (CSV, Markdown, LaTeX) of every model, opening with its size, times and each metric averaged over the signals as `mean±std`, followed by one super column per signal holding that signal's metrics; convergence plots of each metric against iteration and against time, averaged over signals with a standard-error band, written as PDF and as PGF to include in a LaTeX document; and qualitative examples rebuilt from the checkpoints — reconstructed images, meshes and renders, or novel views and an orbit GIF, each named by rank, model and score, and composed into one `comparison.pdf`. `scripts/report_ablation.py` does the same for the FUTON ablations, plus the components and rank grid.
 
 ```bash
 python scripts/report_image.py

@@ -6,12 +6,13 @@ with the model setup, parameter count, training time, final metrics, and
 training history. Finished runs are skipped, so an interrupted sweep resumes
 where it stopped; ``--overwrite`` reruns them instead.
 
-Runs are keyed by model name, so give variants their own names or their own
-``--log-dir``. Several configs are merged in order, and ``--set`` overrides a
-single value::
+The runs of ``configs/<name>.yaml`` go to ``logs/<name>`` unless ``--log-dir``
+says otherwise. Several configs are merged in order, the last naming the log
+directory, and ``--set`` overrides a single value. Runs are keyed by model
+name, so give variants their own names or their own ``--log-dir``::
 
-    --config configs/ablation_futon.yaml --log-dir logs/ablation-futon
-    --set models.FUTON-sinc.train.lr=0.05
+    --config configs/ablation-futon/basis.yaml  # -> logs/ablation-futon/basis
+    --set models.FUTON-sinc.train.lr=0.05 --log-dir logs/sinc-lr
 
 To collect results::
 
@@ -47,6 +48,15 @@ def build(model: dict[str, Any]) -> tuple[type[torch.nn.Module], dict[str, Any]]
     if "output_activation" in kwargs:
         kwargs["output_activation"] = getattr(torch, kwargs["output_activation"])
     return getattr(nf, model["class"]), kwargs
+
+
+def default_log_dir(config: Path) -> Path:
+    """``logs/<name>`` for ``configs/<name>.yaml``, so each config's runs stay apart."""
+    config, configs = config.resolve(), ROOT / "configs"
+    name = (
+        config.relative_to(configs) if config.is_relative_to(configs) else config.name
+    )
+    return ROOT / "logs" / Path(name).with_suffix("")
 
 
 def relative(path: Path) -> str:
@@ -119,7 +129,9 @@ def run(
         metavar="KEY.PATH=VALUE",
         help="config overrides, e.g. train.num_epochs=500",
     )
-    parser.add_argument("--log-dir", type=Path, default=ROOT / "logs" / task)
+    parser.add_argument(
+        "--log-dir", type=Path, help="default: logs/<name> for configs/<name>.yaml"
+    )
     parser.add_argument(
         "--overwrite", action="store_true", help="rerun runs that already finished"
     )
@@ -133,6 +145,7 @@ def run(
     if not args.data:
         parser.error(f"no signals found; pass --data (see scripts/train_{task}.py)")
 
+    log_dir = args.log_dir or default_log_dir(args.config[-1])
     config: dict[str, Any] = {}
     for path in args.config:
         merge(config, yaml.safe_load(path.read_text()))
@@ -154,7 +167,7 @@ def run(
             if prepare is not None:
                 model = prepare(model, path)
 
-            out = args.log_dir / path.stem / name
+            out = log_dir / path.stem / name
             results = out / "results.json"
             if results.exists() and not args.overwrite:
                 if json.loads(results.read_text()).get("setup") != model:

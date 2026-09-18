@@ -1,8 +1,8 @@
 # Occupancy volume representation: fit each model to one Stanford shape.
 #
-# The FUTON entries use K = 128 components and CP rank 218 (131,673
-# parameters), which at this size beats K = 256, R = 144 by about 0.1 IoU
-# points for each basis (configs/tuning_futon.yaml).
+# The FUTON entries use K = 128 components, CP rank 218 and a one-layer MLP
+# decoder (131,673 parameters); at this size, that beat K = 256, R = 144 by
+# about 0.1 IoU points for each basis.
 #
 # Each model has a neurofield class, its constructor arguments, and training
 # arguments that override the shared ones. "deviation" marks a departure from

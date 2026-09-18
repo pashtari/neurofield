@@ -154,11 +154,11 @@ python scripts/train_nerf.py        # Blender scenes     -> logs/nerf/<scene>/<m
 
 The YAML configs hold the shared data and training settings and, per model, its `neurofield` class, constructor arguments, and training overrides (e.g. the learning rate). Image configs may use size expressions in the image height `H` and width `W`, such as `max(H, W) // 2`.
 
-Runs are keyed by model name, so an ablation gives its variants their own names or its own `--log-dir`. `configs/ablation_futon.yaml` and `configs/tuning_futon.yaml` hold the FUTON ablations and tuning on the occupancy task. `--set` overrides a single value, and `--overwrite` reruns finished runs instead of skipping them:
+The runs of `configs/<name>.yaml` go to `logs/<name>/`. Runs are keyed by model name, so variants of a model need their own names or their own `--log-dir`. `configs/ablation-futon/` holds the three FUTON ablations on the occupancy task: the basis, components against rank, and the tensor network. `--set` overrides a single value, and `--overwrite` reruns finished runs instead of skipping them:
 
 ```bash
-python scripts/train_occupancy.py --config configs/ablation_futon.yaml --log-dir logs/ablation-futon
-python scripts/train_image.py --set models.SIREN.train.lr=0.001 --log-dir logs/ablation-lr
+python scripts/train_occupancy.py --config configs/ablation-futon/basis.yaml  # -> logs/ablation-futon/basis/
+python scripts/train_image.py --set models.SIREN.train.lr=0.001 --log-dir logs/siren-lr
 ```
 
 Each run directory holds `log.txt`, `log.json`, `checkpoint.pt`, the final reconstruction (NeRF: selected test views), and `results.json` with the model setup, parameter count, training time, final metrics (NeRF: all 200 test views), and training history.
@@ -198,7 +198,7 @@ neurofield/
 │   ├── tensorf.py            # TensoRF
 │   ├── grid_inr.py           # GridINR
 │   ├── futon.py              # FUTON, bases, combiners
-│   ├── rcs_matrix.py         # RCSMatrix (row-contiguous sparse features)
+│   ├── rcs_matrix.py         # RCSMatrix, rcs_product (row-contiguous sparse features)
 │   └── dip.py                # DIPUNet, DIPSkip
 ├── datasets.py               # ImageCoordinateDataset, OccupancyCoordinateDataset, MRICoordinateDataset, ...
 ├── losses.py                 # rate_distortion_loss, sdf_loss, soft_entropy, laplace_entropy

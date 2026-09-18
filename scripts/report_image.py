@@ -6,9 +6,8 @@ Usage:
     python scripts/report_image.py --qualitative kodim17 kodim04
 
 Writes results/image/: summary.{csv,md,tex} averaged over the images,
-<metric>_{iteration,time},
-and qualitative/<image>/ with the original and each model's reconstruction,
-named by rank, model and PSNR.
+<metric>_{iteration,time}, and qualitative/<image>/ with the original and each
+model's reconstruction, named by rank, model and PSNR.
 """
 
 from pathlib import Path

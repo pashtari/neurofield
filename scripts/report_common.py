@@ -62,7 +62,8 @@ def scale(metric: str, value: float) -> float:
 def header(metric: str) -> str:
     """``PSNR (dB) up``: the name, its unit, and which direction is better."""
     name, larger_is_better, _, _ = METRICS[metric]
-    return f"{name} {'\u2191' if larger_is_better else '\u2193'}"
+    arrow = "\u2191" if larger_is_better else "\u2193"
+    return f"{name} {arrow}"
 
 
 def entry(metric: str, mean: float, deviation: float | None = None) -> str:
@@ -191,7 +192,6 @@ def table(
     out_dir: Path,
     speed: str = "img/s",
     per_signal: bool = True,
-    name: str = "summary",
 ) -> pd.DataFrame:
     """One table of every model: size, time, speed, and each metric.
 
@@ -222,8 +222,8 @@ def table(
             )
     summary = pd.DataFrame(columns).loc[models].fillna("")
     out_dir.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(out_dir / f"{name}.csv", index_label="Model")
-    (out_dir / f"{name}.md").write_text(markdown(summary))
+    summary.to_csv(out_dir / "summary.csv", index_label="Model")
+    (out_dir / "summary.md").write_text(markdown(summary))
     # LaTeX reads #, % and _ as markup; none of the commands pandas emits
     # contains them, so escaping the whole table is safe.
     latex = summary.to_latex(multicolumn=True, multicolumn_format="c")
@@ -236,7 +236,7 @@ def table(
         ("\u00b1", r"$\pm$"),
     ):
         latex = latex.replace(character, command)
-    (out_dir / f"{name}.tex").write_text(latex)
+    (out_dir / "summary.tex").write_text(latex)
     return summary
 
 

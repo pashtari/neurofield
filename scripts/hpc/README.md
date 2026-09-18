@@ -106,10 +106,11 @@ Estimated start: 2026-09-17T21:33:00
 That estimate assumes every running job uses its full wall time, so jobs often
 start earlier, and later when higher-priority jobs arrive.
 
-The GPU clusters are accelgor (A100), joltik (V100) and litleo (H100); the
-other clusters have no GPUs. Keep one cluster for a whole benchmark, since
-`results.json` records training times. A list such as
-`--clusters=accelgor,joltik` submits where the job can start soonest, which is
+The venv runs on two GPU clusters, accelgor (A100) and litleo (H100); the
+third, joltik, has V100s, for which its CUDA 13 PyTorch wheels have no
+kernels. Keep one cluster for a whole benchmark, since `results.json` records
+training times. A list such as
+`--clusters=accelgor,litleo` submits where the job can start soonest, which is
 useful for quick tests. GPUs are often fully allocated, and then a short wall
 time does not help: the job waits for one to be released. To see the wait
 before submitting:
@@ -127,8 +128,10 @@ sbatch --clusters=accelgor --test-only --time=0:10:00 --gpus-per-node=1 \
 - **Task options** (`--data`, `--models`, `--config`, `--set`, `--log-dir`,
   `--overwrite`) come after the task and are passed to
   `scripts/train_<task>.py`. Paths are relative to the repository root on the
-  cluster. For ablations, `--config configs/image.yaml configs/ablation.yaml`
-  layers a config that holds only what changes; runs are keyed by model name,
+  cluster. The runs of `configs/<name>.yaml` go to `logs/<name>/`. Several
+  `--config` files are merged in order, the last naming the log folder, so a
+  small config can hold only what changes, e.g.
+  `--config configs/image.yaml changes.yaml`. Runs are keyed by model name,
   so give variants their own names or another `--log-dir`.
 
 Measured on A100s (2000 epochs; NeRF 37,500 steps), a run takes about:
@@ -146,6 +149,8 @@ a single job is faster.
 
 Pending jobs run whichever code is in the repository when they start, so a
 later `train.sh` call with new commits also affects jobs that are still queued.
+The `commit:` line at the top of a job's output names the commit it started
+from.
 
 A quick test (a few minutes):
 
@@ -154,24 +159,10 @@ scripts/hpc/train.sh --clusters=accelgor --time=0:15:00 image \
   --data data/Kodak/kodim01.png --models SIREN
 ```
 
-The three sweeps, on A100 (accelgor), with wall times sized from the table
-above plus margin:
-
-```bash
-# image: 24 images x 13 models, about 3.5 hours
-scripts/hpc/train.sh --clusters=accelgor --time=5:00:00 image
-
-# occupancy: 5 shapes x 14 models, about 25 minutes
-scripts/hpc/train.sh --clusters=accelgor --time=1:00:00 occupancy
-
-# nerf: 14 models per scene, about 2.5 hours per scene, one job per scene
-for scene in data/nerf/blender/*/; do
-  scripts/hpc/train.sh --clusters=accelgor --time=4:00:00 nerf --data "$scene"
-done
-```
-
-Smaller jobs are scheduled sooner, so the sections below split the same work
-further. Runs already finished are skipped, so the two forms mix freely.
+`JOBS.md` lists every job of this work: the three benchmark sweeps and the
+FUTON ablations. Smaller jobs are scheduled sooner, so the sections below split
+the benchmark sweeps further. Runs already finished are skipped, so the forms
+mix freely.
 
 ### Image representation
 
@@ -198,7 +189,7 @@ done
 ### NeRF
 
 All 14 models on the 8 Blender scenes, with 37,500 steps per model. This is by
-far the longest task: one job per scene and model (about 10 minutes each, 120
+far the longest task: one job per scene and model (about 10 minutes each, 112
 jobs) queues better than one job per scene. Runs are written to
 `logs/nerf/<scene>/<model>/`:
 
@@ -212,27 +203,21 @@ for scene in data/nerf/blender/*/; do
 done
 ```
 
-Submitting 120 jobs opens 120 SSH connections; either set up `ControlMaster`
+Submitting 112 jobs opens 112 SSH connections; either set up `ControlMaster`
 (step 1) or run the loop on a login node.
 
 ### Splitting and resuming
 
-Runs that already have `results.json` are skipped. If a job stops (time limit,
-node failure), submit the same command again. To spread a task over several
-GPUs, submit jobs with disjoint `--data` or `--models` lists. Jobs that share a
-signal and model would write to the same run directory.
+Runs that already have `results.json` are skipped, so a job that stops early
+(a time limit kills it mid-run, or a node fails) is simply submitted again. To
+spread a task over several GPUs, submit jobs with disjoint `--data` or
+`--models` lists; jobs that share a signal and model would write to the same
+run directory.
 
 ```bash
 scripts/hpc/train.sh --clusters=accelgor --time=2:00:00 image --data data/Kodak/kodim0{1..9}.png
 scripts/hpc/train.sh --clusters=accelgor --time=3:00:00 image --data data/Kodak/kodim{10..24}.png
 ```
-
-A job that hits its time limit is killed mid-run; resubmitting the same command
-skips the runs that already finished.
-
-Each `train.sh` call opens its own SSH connection, unless `ControlMaster` is
-set up (step 1). To submit many jobs at once, `ssh hpc-ugent` and run the same
-commands from `$VSC_DATA/projects/neurofield`.
 
 ## 4. Monitor and collect results
 
@@ -251,17 +236,22 @@ explicit `-o` above.
 A failed run leaves `error.txt` in its run directory. The job's final line
 lists all failed runs.
 
-To copy the logs to the local repository (existing and newer local files are
-kept; `-n` is a dry run):
+To copy the logs to the local repository (`-n` is a dry run):
 
 ```bash
 scripts/hpc/pull_logs.sh
 ```
 
+It never deletes local files, and keeps a local file that is newer than the
+cluster's copy, so delete a local run directory to take the cluster's again.
+
 Each run directory contains `results.json` (settings, parameter count,
 training time, final metrics, and training history), `log.txt`, `log.json`,
-`checkpoint.pt`, and, except for occupancy, a reconstruction (rendering a mesh
-needs a display, so recreate those locally from `checkpoint.pt`). Load all runs with:
+`checkpoint.pt`, and the reconstruction of an image or NeRF's selected test
+views. Occupancy runs write no mesh, since rendering one needs a display; the
+occupancy report rebuilds them from `checkpoint.pt`. `JOBS.md` shows how the
+reports turn the runs into tables, plots and examples; to load the runs
+directly:
 
 ```python
 records = [json.loads(p.read_text()) for p in Path("logs").rglob("results.json")]

@@ -366,7 +366,17 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-2}
 
-  # Other bases, at the reference size (K=256, R=144).
+  # Other bases, at the reference size (K=256, R=144). Triangle is a local
+  # basis: unlike the others it has no grid cache, it interpolates instead.
+  FUTON-triangle:
+    class: FUTON
+    kwargs:
+      basis: [triangle, {num_components: 256}]
+      combiner: [cp, {rank: 144}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
   FUTON-chebyshev:
     class: FUTON
     kwargs:

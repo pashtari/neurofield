@@ -147,14 +147,6 @@ models:
       decoder: [mlp, {hidden_layers: 1}]
     train: {lr: 3.0e-2}
 
-  FUTON-triangle:
-    class: FUTON
-    kwargs:
-      basis: [triangle, {num_components: 128}]
-      combiner: [cp, {rank: 128}]
-      decoder: [mlp, {hidden_layers: 1}]
-    train: {lr: 3.0e-2}
-
   FUTON-lanczos:
     class: FUTON
     kwargs:

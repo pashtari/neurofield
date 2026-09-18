@@ -1,8 +1,5 @@
-# Tuning FUTON on the occupancy task, at the benchmark's size.
-#
-# Every entry holds about 131,600 parameters, the size of the FUTON entries of
-# configs/occupancy.yaml, so a gain here is a better use of the same budget and
-# not a larger model. The reference is FUTON-sinc (K=256, R=144, lr 1e-2).
+# Tuning FUTON on the occupancy task at the benchmark's size: every entry
+# holds about 131,600 parameters, so a gain is a better use of the budget.
 #     scripts/train_occupancy.py --config configs/tuning_futon.yaml \
 #         --log-dir logs/tuning-futon
 
@@ -18,7 +15,7 @@ train:
   seed: 0
 
 models:
-  # The benchmark entry, for reference.
+  # The reference: K=256, R=144, a one-layer MLP decoder.
   FUTON-sinc:
     class: FUTON
     kwargs:
@@ -28,7 +25,7 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-2}
 
-  # Components against rank, at a fixed size.
+  # K against R, at a fixed size.
   FUTON-sinc-K64-R279:
     class: FUTON
     kwargs:
@@ -119,8 +116,63 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-2}
 
+  # R = K.
+  FUTON-cosine-K181-R181:
+    class: FUTON
+    kwargs:
+      basis: [cosine, {num_components: 181, grid_size: 256}]
+      combiner: [cp, {rank: 181}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-cosine-linear-K209-R209:
+    class: FUTON
+    kwargs:
+      basis: [cosine, {num_components: 209, grid_size: 256}]
+      combiner: [cp, {rank: 209}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K181-R181:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 181, radius: 3}]
+      combiner: [cp, {rank: 181}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-linear-K209-R209:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 209, radius: 3}]
+      combiner: [cp, {rank: 209}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc-K181-R181:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 181, grid_size: 256}]
+      combiner: [cp, {rank: 181}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc-linear-K209-R209:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 209, grid_size: 256}]
+      combiner: [cp, {rank: 209}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
   # The decoder, with the rank raised to keep the size.
-  FUTON-sinc-linear:  # no hidden layer
+  FUTON-sinc-linear:
     class: FUTON
     kwargs:
       basis: [sinc, {num_components: 128, grid_size: 256}]
@@ -147,7 +199,71 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-2}
 
-  # The learning rate.
+  # The linear decoder across K and bases.
+  FUTON-sinc-linear-K96-R455:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 96, grid_size: 256}]
+      combiner: [cp, {rank: 455}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc-linear-K192-R228:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 192, grid_size: 256}]
+      combiner: [cp, {rank: 228}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc-linear-K256-R171:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 256, grid_size: 256}]
+      combiner: [cp, {rank: 171}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-cosine-linear-K128-R342:
+    class: FUTON
+    kwargs:
+      basis: [cosine, {num_components: 128, grid_size: 256}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-triangle-linear-K128-R342:
+    class: FUTON
+    kwargs:
+      basis: [triangle, {num_components: 128}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-linear-K128-R342:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-legendre-linear-K128-R342:
+    class: FUTON
+    kwargs:
+      basis: [legendre, {num_components: 128}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  # Learning rate, basis normalization, and a combiner bias.
   FUTON-sinc-lr3e-3:
     class: FUTON
     kwargs:
@@ -166,7 +282,6 @@ models:
       output_activation: tanh
     train: {lr: 3.0e-2}
 
-  # Two switches: the basis normalization, and a bias in the combiner.
   FUTON-sinc-unnormalized:
     class: FUTON
     kwargs:
@@ -185,7 +300,7 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-2}
 
-  # The other bases at the best shape.
+  # Other bases at K=128, R=218.
   FUTON-legendre-K128-R218:
     class: FUTON
     kwargs:

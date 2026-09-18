@@ -1,12 +1,8 @@
-# FUTON ablations on the occupancy task, self-contained: run it with
+# FUTON ablations on the occupancy task:
 #     scripts/train_occupancy.py --config configs/ablation_futon.yaml \
 #         --log-dir logs/ablation-futon
-# The data and training settings repeat configs/occupancy.yaml, so that the
-# reference entries (FUTON-cosine, FUTON-sinc) match the benchmark exactly.
-#
-# A tensor-ring combiner of rank r has the same parameter count as a CP
-# combiner of rank r^2 at equal num_components, so the TR entries below pair
-# exactly with the CP ones: r=12 with the reference R=144, r=16 with R=256.
+# The settings repeat configs/occupancy.yaml, and the reference model is
+# K=256 components, CP rank 144 and a one-layer MLP decoder (131,617 parameters).
 
 data:
   resolution: 256
@@ -20,12 +16,20 @@ train:
   seed: 0
 
 models:
-  # Reference: the entries of configs/occupancy.yaml, repeated so that the
-  # ablation tables stand on their own.
+  # Bases, at the reference size.
   FUTON-cosine:
     class: FUTON
     kwargs:
       basis: [cosine, {num_components: 256, grid_size: 256}]
+      combiner: [cp, {rank: 144}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 256, radius: 3}]
       combiner: [cp, {rank: 144}]
       decoder: [mlp, {hidden_layers: 1}]
       output_activation: tanh
@@ -40,7 +44,34 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-2}
 
-  # Rank R and components K, a full grid for each basis.
+  FUTON-triangle:
+    class: FUTON
+    kwargs:
+      basis: [triangle, {num_components: 256}]
+      combiner: [cp, {rank: 144}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-chebyshev:
+    class: FUTON
+    kwargs:
+      basis: [chebyshev, {num_components: 256}]
+      combiner: [cp, {rank: 144}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-legendre:
+    class: FUTON
+    kwargs:
+      basis: [legendre, {num_components: 256}]
+      combiner: [cp, {rank: 144}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  # Components K against rank R.
   FUTON-cosine-K64-R64:
     class: FUTON
     kwargs:
@@ -180,6 +211,150 @@ models:
     class: FUTON
     kwargs:
       basis: [cosine, {num_components: 512, grid_size: 256}]
+      combiner: [cp, {rank: 512}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K64-R64:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 64, radius: 3}]
+      combiner: [cp, {rank: 64}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K64-R128:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 64, radius: 3}]
+      combiner: [cp, {rank: 128}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K64-R256:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 64, radius: 3}]
+      combiner: [cp, {rank: 256}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K64-R512:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 64, radius: 3}]
+      combiner: [cp, {rank: 512}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K128-R64:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 64}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K128-R128:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 128}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K128-R256:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 256}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K128-R512:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 512}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K256-R64:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 256, radius: 3}]
+      combiner: [cp, {rank: 64}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K256-R128:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 256, radius: 3}]
+      combiner: [cp, {rank: 128}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K256-R256:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 256, radius: 3}]
+      combiner: [cp, {rank: 256}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K256-R512:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 256, radius: 3}]
+      combiner: [cp, {rank: 512}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K512-R64:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 512, radius: 3}]
+      combiner: [cp, {rank: 64}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K512-R128:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 512, radius: 3}]
+      combiner: [cp, {rank: 128}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K512-R256:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 512, radius: 3}]
+      combiner: [cp, {rank: 256}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-K512-R512:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 512, radius: 3}]
       combiner: [cp, {rank: 512}]
       decoder: [mlp, {hidden_layers: 1}]
       output_activation: tanh
@@ -329,7 +504,17 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-2}
 
-  # Tensor ring instead of CP, at the parameter counts of CP R=144 and R=256.
+  # Tensor ring against CP at K=256. A TR combiner of rank r has the size of a
+  # CP combiner of rank r^2, so r = 8, 12, 16 pair with R = 64, 144, 256.
+  FUTON-cosine-TR-K256-R8:
+    class: FUTON
+    kwargs:
+      basis: [cosine, {num_components: 256, grid_size: 256}]
+      combiner: [tr, {rank: 8}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
   FUTON-cosine-TR-K256-R12:
     class: FUTON
     kwargs:
@@ -348,6 +533,42 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-2}
 
+  FUTON-lanczos-TR-K256-R8:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 256, radius: 3}]
+      combiner: [tr, {rank: 8}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-TR-K256-R12:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 256, radius: 3}]
+      combiner: [tr, {rank: 12}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-TR-K256-R16:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 256, radius: 3}]
+      combiner: [tr, {rank: 16}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc-TR-K256-R8:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 256, grid_size: 256}]
+      combiner: [tr, {rank: 8}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
   FUTON-sinc-TR-K256-R12:
     class: FUTON
     kwargs:
@@ -362,35 +583,6 @@ models:
     kwargs:
       basis: [sinc, {num_components: 256, grid_size: 256}]
       combiner: [tr, {rank: 16}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  # Other bases, at the reference size (K=256, R=144). Triangle is a local
-  # basis: unlike the others it has no grid cache, it interpolates instead.
-  FUTON-triangle:
-    class: FUTON
-    kwargs:
-      basis: [triangle, {num_components: 256}]
-      combiner: [cp, {rank: 144}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-chebyshev:
-    class: FUTON
-    kwargs:
-      basis: [chebyshev, {num_components: 256, grid_size: 256}]
-      combiner: [cp, {rank: 144}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-legendre:
-    class: FUTON
-    kwargs:
-      basis: [legendre, {num_components: 256, grid_size: 256}]
-      combiner: [cp, {rank: 144}]
       decoder: [mlp, {hidden_layers: 1}]
       output_activation: tanh
     train: {lr: 1.0e-2}

@@ -381,8 +381,13 @@ def model_config(run: dict[str, Any]) -> dict[str, Any]:
     """The config a run was trained with, for rebuilding its model."""
     recorded = run.get("config") or [f"configs/{run['task']}.yaml"]
     config: dict[str, Any] = {}
-    for path in (path for path in recorded if "=" not in path):  # drop --set
-        merge(config, yaml.safe_load((ROOT / path).read_text()))
+    for path in (Path(path) for path in recorded if "=" not in path):  # drop --set
+        # Runs from another checkout recorded its absolute path, so fall back
+        # to the same file here.
+        local = ROOT / path
+        if not local.exists():
+            local = ROOT / "configs" / path.name
+        merge(config, yaml.safe_load(local.read_text()))
     return config
 
 

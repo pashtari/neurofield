@@ -49,6 +49,14 @@ def build(model: dict[str, Any]) -> tuple[type[torch.nn.Module], dict[str, Any]]
     return getattr(nf, model["class"]), kwargs
 
 
+def relative(path: Path) -> str:
+    """A path inside the repository as a repository-relative one."""
+    resolved = path.resolve()
+    return str(
+        resolved.relative_to(ROOT) if resolved.is_relative_to(ROOT) else resolved
+    )
+
+
 def merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
     """Deep-merge ``overlay`` into ``base``, in place."""
     for key, value in overlay.items():
@@ -178,7 +186,8 @@ def run(
                 "data": path.stem,
                 "model": name,
                 "train_time": result["history"][-1]["elapsed"],
-                "config": [str(path) for path in args.config] + args.settings,
+                # Relative to the repository, so a report reads them anywhere.
+                "config": [relative(path) for path in args.config] + args.settings,
             }
             text = json.dumps(result, indent=2, default=str)
             (out / "results.json").write_text(text + "\n")

@@ -1,0 +1,49 @@
+# FUTON with a linear decoder on the image task, at the benchmark's size,
+# after the occupancy tuning found the combiner rank a better use of the
+# budget than a decoder MLP.
+
+data:
+  subsample: 0.1
+
+train:
+  num_epochs: 2000
+  log_interval: 100
+  eval_interval: 100
+  seed: 0
+
+models:
+  FUTON-sinc-linear:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
+      combiner: [cp, {rank: 303}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-cosine-linear:
+    class: FUTON
+    kwargs:
+      basis: [cosine, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
+      combiner: [cp, {rank: 303}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos-linear:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: [H // 2, W // 2], radius: 3}]
+      combiner: [cp, {rank: 303}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-sinc-linear-half:  # half the components, twice the rank
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: [H // 4, W // 4], grid_size: [H, W]}]
+      combiner: [cp, {rank: 605}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}

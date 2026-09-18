@@ -1,5 +1,9 @@
 # Occupancy volume representation: fit each model to one Stanford shape.
 #
+# The FUTON entries spend their budget on the combiner rather than a decoder
+# MLP: at this size a linear decoder with rank 342 beats rank 144 with one
+# hidden layer by about 0.15 IoU points (configs/tuning_futon.yaml).
+#
 # Each model has a neurofield class, its constructor arguments, and training
 # arguments that override the shared ones. "deviation" marks a departure from
 # the authors' published settings.
@@ -134,26 +138,26 @@ models:
   FUTON-cosine:
     class: FUTON
     kwargs:
-      basis: [cosine, {num_components: 256, grid_size: 256}]
-      combiner: [cp, {rank: 144}]
-      decoder: [mlp, {hidden_layers: 1}]
+      basis: [cosine, {num_components: 128, grid_size: 256}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
       output_activation: tanh
     train: {lr: 1.0e-2}
 
   FUTON-sinc:
     class: FUTON
     kwargs:
-      basis: [sinc, {num_components: 256, grid_size: 256}]
-      combiner: [cp, {rank: 144}]
-      decoder: [mlp, {hidden_layers: 1}]
+      basis: [sinc, {num_components: 128, grid_size: 256}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
       output_activation: tanh
     train: {lr: 1.0e-2}
 
   FUTON-lanczos:
     class: FUTON
     kwargs:
-      basis: [lanczos, {num_components: 256, radius: 3}]
-      combiner: [cp, {rank: 144}]
-      decoder: [mlp, {hidden_layers: 1}]
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
       output_activation: tanh
     train: {lr: 1.0e-2}

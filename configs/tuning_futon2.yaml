@@ -1,0 +1,89 @@
+# A second tuning round: the linear decoder of the first round, across the
+# number of components and the bases. Each entry holds about 131,600
+# parameters, the size of the benchmark's FUTON entries.
+
+data:
+  resolution: 256
+  subsample: 0.01
+
+train:
+  num_epochs: 2000
+  log_interval: 100
+  eval_interval: 100
+  chunk_size: 262144
+  seed: 0
+
+models:
+  # Components, with the rank set to keep the size.
+  FUTON-sinc-linear-K96-R455:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 96, grid_size: 256}]
+      combiner: [cp, {rank: 455}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc-linear-K128-R342:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 128, grid_size: 256}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc-linear-K192-R228:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 192, grid_size: 256}]
+      combiner: [cp, {rank: 228}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc-linear-K256-R171:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 256, grid_size: 256}]
+      combiner: [cp, {rank: 171}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  # The other bases at the best shape of the first round.
+  FUTON-cosine-linear-K128-R342:
+    class: FUTON
+    kwargs:
+      basis: [cosine, {num_components: 128, grid_size: 256}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-triangle-linear-K128-R342:
+    class: FUTON
+    kwargs:
+      basis: [triangle, {num_components: 128}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-linear-K128-R342:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-legendre-linear-K128-R342:
+    class: FUTON
+    kwargs:
+      basis: [legendre, {num_components: 128}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}

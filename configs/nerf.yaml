@@ -34,7 +34,7 @@ models:
       hidden_layers: 2
       num_frequencies: 90
       sigma: 8.0
-    train: {lr: 1.0e-2}
+    train: {lr: 3.0e-3}  # 1e-2 costs 1.7 dB on ship
 
   PE-MLP:
     class: PEMLP
@@ -63,7 +63,7 @@ models:
       hidden_features: 180
       hidden_layers: 3
       omega: 30.0
-    train: {lr: 1.0e-3}
+    train: {lr: 2.0e-4}  # 1e-3 costs 3.7 dB on lego
 
   Gauss:
     class: Gauss
@@ -80,7 +80,7 @@ models:
       hidden_layers: 3
       omega: 20.0
       scale: 10.0
-    train: {lr: 3.0e-3}
+    train: {lr: 1.0e-3}  # 3e-3 costs 2.3 dB on lego
 
   FINER:
     class: FINER
@@ -88,7 +88,7 @@ models:
       hidden_features: 180
       hidden_layers: 3
       omega: 30.0
-    train: {lr: 1.0e-3}
+    train: {lr: 2.0e-4}  # 1e-3 costs 5.7 dB on lego
 
   Instant-NGP:  # instant-ngp density network, paper hash grid
     class: InstantNGP

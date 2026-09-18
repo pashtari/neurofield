@@ -1,0 +1,54 @@
+# FUTON with a linear decoder on the NeRF task, at the benchmark's size.
+
+data:
+  downsample: 4
+  train_skip: 4
+  val_skip: 25
+
+field:
+  geometry_features: 15
+  direction_encoding: sh
+  color_net: [mlp, {hidden_features: 64, hidden_layers: 2}]
+
+train:
+  num_steps: 37500
+  num_rays: 4096
+  max_samples_per_ray: 1024
+  log_interval: 100
+  eval_interval: 2500
+  seed: 0
+
+render_views: [0, 55]
+
+models:
+  FUTON-sinc-linear:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 128}]
+      combiner: [cp, {rank: 192}]
+      decoder: linear
+    train: {lr: 3.0e-2}
+
+  FUTON-cosine-linear:
+    class: FUTON
+    kwargs:
+      basis: [cosine, {num_components: 128}]
+      combiner: [cp, {rank: 192}]
+      decoder: linear
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos-linear:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 192}]
+      decoder: linear
+    train: {lr: 3.0e-2}
+
+  FUTON-sinc-linear-K64:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 64}]
+      combiner: [cp, {rank: 384}]
+      decoder: linear
+    train: {lr: 3.0e-2}

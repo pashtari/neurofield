@@ -53,6 +53,35 @@ To run one study alone, add `--models`, e.g.
 `--models FUTON-chebyshev FUTON-legendre`. To split the sweep over several
 GPUs, give each job its own shapes with `--data`.
 
+## Tuning
+
+`configs/tuning_futon.yaml` holds 22 FUTON variants of the benchmark's size
+(about 131,600 parameters each), so a gain is a better use of the same budget:
+components against rank at fixed size, three decoders, two learning rates, the
+basis normalization, a combiner bias, and the other bases. 22 models x 5
+shapes = 110 runs, about an hour:
+
+```bash
+scripts/hpc/train.sh --clusters=accelgor --time=3:00:00 occupancy \
+  --config configs/tuning_futon.yaml --log-dir logs/tuning-futon
+```
+
+To retune one baseline, override its rate and send the runs elsewhere:
+
+```bash
+scripts/hpc/train.sh --clusters=accelgor --time=2:00:00 nerf \
+  --models SIREN FINER --data data/nerf/blender/lego \
+  --set models.SIREN.train.lr=3.0e-3 --log-dir logs/tune-nerf/lr3e-3
+```
+
+A config change to a model that has already run needs `--overwrite`, which
+reruns it in place:
+
+```bash
+scripts/hpc/train.sh --clusters=accelgor --time=2:00:00 image \
+  --models Gauss --overwrite
+```
+
 ## Reports
 
 Training keeps every run's `checkpoint.pt` but writes no figures, so tables,
@@ -70,7 +99,8 @@ Each writes one table (CSV, Markdown, LaTeX) of the models: their size,
 times and metrics averaged over the signals as `mean±std`, then one super
 column per signal (image, with 24 of them, keeps the average alone),
 convergence plots per metric against iteration and time as PDF and PGF, and
-qualitative examples rendered from the checkpoints; `--qualitative` picks the signals, `--qualitative none` skips
+qualitative examples rendered from the checkpoints, each signal's also
+composed into one `comparison.pdf`; `--qualitative` picks the signals, `--qualitative none` skips
 them. Rendering a mesh needs a display, so run the occupancy report on a
 workstation. NeRF renders need none and can run on the cluster:
 

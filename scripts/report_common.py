@@ -271,6 +271,26 @@ def table(
     return summary
 
 
+def within_signal_error(data: pd.DataFrame, metric: str) -> pd.Series:
+    """Standard error of each model's mean, with the signal effect removed.
+
+    Every model is measured on the same signals, so their differing difficulty
+    inflates a plain standard error without telling the models apart. Centring
+    each signal on the average of the models removes that shared effect; the
+    Morey factor corrects for the degree of freedom it costs.
+    """
+    errors = {}
+    for iteration, block in data.groupby("iteration"):
+        values = block.pivot_table(index="signal", columns="model", values=metric)
+        signals, models = values.shape
+        centred = values.sub(values.mean(axis=1), axis=0)
+        correction = (models / (models - 1)) ** 0.5 if models > 1 else 1.0
+        errors[iteration] = centred.std(ddof=1) / signals**0.5 * correction
+    return pd.concat(errors, names=["iteration", "model"]).reorder_levels(
+        ["model", "iteration"]
+    )
+
+
 def convergence(
     data: pd.DataFrame,
     metrics: Sequence[str],
@@ -280,11 +300,14 @@ def convergence(
 ) -> None:
     """Plot each metric against iteration and against time, averaged over signals.
 
-    The band is the standard error of the mean over the signals: a standard
-    deviation would show the spread between signals, which is wide enough to
-    bury the difference between models. The lines are drawn from the
-    per-iteration mean rather than by seaborn's own aggregation, because the
-    elapsed time differs between signals. ``time_limit``
+    The band is a within-signal standard error: every model is measured on
+    the same signals, so the spread between signals (a hard scene against an
+    easy one) is common to all of them and says nothing about which model is
+    better. Centring each signal on the average of the models removes it and
+    leaves the variation that does separate them (Cousineau-Morey). The lines
+    are drawn from the per-iteration mean rather than by seaborn's own
+    aggregation, because the elapsed time differs between signals.
+    ``time_limit``
     crops the time axis, where the slowest models would otherwise set a scale
     on which the rest finish immediately.
     """
@@ -295,24 +318,16 @@ def convergence(
     }
     for metric in metrics:
         grouped = data.groupby(["model", "iteration"]).agg(
-            time=("time", "mean"),
-            mean=(metric, "mean"),
-            sd=(metric, "sem"),  # standard error: the deviation over sqrt(n)
+            time=("time", "mean"), mean=(metric, "mean")
         )
+        grouped["sd"] = within_signal_error(data, metric)
         for axis, label in (("iteration", "Iteration"), ("time", "Time (s)")):
-            figure, plot = plt.subplots(figsize=(7, 4.5))
+            figure, plot = plt.subplots()
             for model in models:
                 line = grouped.loc[model].reset_index()
                 x = line["iteration"] if axis == "iteration" else line["time"]
                 color, style = lines[model]
-                plot.plot(
-                    x,
-                    line["mean"],
-                    label=model,
-                    color=color,
-                    linestyle=style,
-                    linewidth=2,
-                )
+                plot.plot(x, line["mean"], label=model, color=color, linestyle=style)
                 if line["sd"].notna().any():
                     plot.fill_between(
                         x,
@@ -329,28 +344,35 @@ def convergence(
             # Bands, early transients and a diverged model each set a range
             # on which the rest sit on top of each other. So keep the best end
             # and trim the weak one to the tenth percentile of the second half
-            # of the run, where the models have converged and separate.
+            # of the run, where the models have converged and separate, then
+            # widen it to every model's final value -- except a collapsed one,
+            # which would undo the trimming.
             shown = grouped.reset_index()
             if axis == "time" and time_limit:
                 shown = shown[shown[axis] <= time_limit]
             converged = shown[shown[axis] >= shown[axis].median()]["mean"]
+            finals = shown.groupby("model")["mean"].last()
             if METRICS[metric][1]:
-                low, high = converged.quantile(0.10), shown["mean"].max()
+                finals = finals[finals >= 0.5 * finals.max()]
+                low = min(converged.quantile(0.10), finals.min())
+                high = shown["mean"].max()
             else:
-                low, high = shown["mean"].min(), converged.quantile(0.90)
+                finals = finals[finals <= 5 * finals.min()]
+                low = shown["mean"].min()
+                high = max(converged.quantile(0.90), finals.max())
             margin = 0.05 * (high - low)
             plot.set_ylim(low - margin, high + margin)
 
-            # Worst at the top, best at the bottom, in the corner the rising
-            # (or falling) curves leave free.
+            # Worst at the top, best at the bottom, wherever the curves leave
+            # the most room.
             handles, labels = plot.get_legend_handles_labels()
             plot.legend(
                 handles[::-1],
                 labels[::-1],
-                loc="lower right" if METRICS[metric][1] else "upper right",
+                loc="best",
                 ncol=2 if len(models) > 8 else 1,
-                fontsize=8,
-                framealpha=0.85,
+                framealpha=0.9,
+                edgecolor="0.8",
             )
             save(figure, out_dir / f"{metric}_{axis}")
 
@@ -400,10 +422,59 @@ def examples(
     return chosen
 
 
+def montage(panels: Sequence[tuple[str, Path]], path: Path, columns: int = 5) -> None:
+    """Lay saved images out as one figure, for a paper's qualitative row."""
+    import matplotlib.image as mpimg
+
+    rows = -(-len(panels) // columns)
+    width, height = plt.rcParams["figure.figsize"]
+    figure, axes = plt.subplots(
+        rows, columns, figsize=(width, width / columns * rows * 1.15), squeeze=False
+    )
+    for axis, (label, image) in zip(axes.ravel(), panels):
+        axis.imshow(mpimg.imread(image))
+        axis.set_title(label, fontsize=7, pad=2)
+    for axis in axes.ravel():
+        axis.set_axis_off()
+    # PDF only: a PGF of raster panels writes each one out beside it.
+    path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(path.with_suffix(".pdf"), bbox_inches="tight")
+    plt.close(figure)
+
+
 def style() -> None:
-    """One look for every report."""
-    sns.set_theme(style="whitegrid", context="paper", font_scale=1.1)
-    plt.rcParams["figure.constrained_layout.use"] = True
+    """One look for every report: a figure that suits a paper column.
+
+    Sizes are the final ones, since a PGF figure is included as it is. With
+    ``pgf.rcfonts`` off the text is typeset in the document's own font, so the
+    figures match the surrounding paper rather than carrying matplotlib's.
+    """
+    sns.set_theme(style="ticks", context="paper")
+    plt.rcParams.update(
+        {
+            "figure.figsize": (5.5, 3.4),
+            "figure.constrained_layout.use": True,
+            "axes.grid": True,
+            "grid.alpha": 0.25,
+            "grid.linewidth": 0.5,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "axes.linewidth": 0.8,
+            "font.size": 9,
+            "axes.labelsize": 10,
+            "axes.titlesize": 10,
+            "xtick.labelsize": 9,
+            "ytick.labelsize": 9,
+            "legend.fontsize": 7,
+            "legend.borderpad": 0.4,
+            "legend.columnspacing": 1.0,
+            "legend.handlelength": 1.6,
+            "lines.linewidth": 1.5,
+            "pgf.texsystem": "pdflatex",
+            "pgf.rcfonts": False,
+            "savefig.pad_inches": 0.02,
+        }
+    )
 
 
 def report(

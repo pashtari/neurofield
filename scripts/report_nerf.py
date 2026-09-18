@@ -56,6 +56,7 @@ def qualitative(
         batch = dataset[view]
         target = (dataset.composite(batch["rgba"]) * 255).round().byte().numpy()
         Image.fromarray(target).save(directory / f"00_ground_truth_view{view:03d}.png")
+        panels = [("Ground truth", directory / f"00_ground_truth_view{view:03d}.png")]
 
         # The dataset's own camera elevation and radius, in its scaled frame.
         poses = [
@@ -83,6 +84,12 @@ def qualitative(
             )
             image = (rendered["rgb"].clamp(0, 1) * 255).round().byte().cpu().numpy()
             Image.fromarray(image).save(directory / f"{name}_view{view:03d}.png")
+            panels.append(
+                (
+                    f"{run['model']}\n{run['metrics']['psnr']:.2f} dB",
+                    directory / f"{name}_view{view:03d}.png",
+                )
+            )
 
             if not frames:  # an orbit is a minute of rendering per model
                 continue
@@ -97,6 +104,7 @@ def qualitative(
                 duration=1000 // 15,
                 loop=0,
             )
+        report.montage(panels, directory / "comparison")
         print(f"{signal}: written to {directory}")
 
 

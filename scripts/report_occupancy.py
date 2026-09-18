@@ -31,6 +31,7 @@ def qualitative(runs: list[dict], signals: list[str], out_dir: Path, device) -> 
             item_id=signal,
         )
         dataset.save(dataset.original, directory / "00_ground_truth")
+        panels = [("Ground truth", directory / "00_ground_truth.png")]
 
         print(f"{signal}: rendering {len(ranked)} meshes", flush=True)
         for rank, run in enumerate(ranked, start=1):
@@ -42,13 +43,18 @@ def qualitative(runs: list[dict], signals: list[str], out_dir: Path, device) -> 
             value = report.scale("iou", run["metrics"]["iou"])
             name = report.figure_name(rank, run["model"], "iou", value)
             dataset.save(dataset.postprocess(output.cpu()), directory / name)
+            panels.append(
+                (f"{run['model']}\n{value:.2f}% IoU", directory / f"{name}.png")
+            )
+        if all(image.exists() for _, image in panels):  # rendering needs a display
+            report.montage(panels, directory / "comparison")
         print(f"{signal}: written to {directory}")
 
 
 def main() -> None:
     args = report.parser("occupancy", "occupancy", "lucy").parse_args()
     runs = report.read(args.log_dir, "occupancy", args.models)
-    summary = report.report(runs, METRICS, args.out_dir, "occupancy", time_limit=10)
+    summary = report.report(runs, METRICS, args.out_dir, "occupancy", time_limit=15)
     print(summary.to_string())
     if args.qualitative != ["none"]:
         qualitative(runs, args.qualitative, args.out_dir, args.device)

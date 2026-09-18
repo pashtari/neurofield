@@ -28,6 +28,7 @@ def qualitative(runs: list[dict], signals: list[str], out_dir: Path, device) -> 
             report.ROOT / report.SIGNALS["image"].format(signal)
         )
         dataset.save(dataset.original, directory / "00_ground_truth")
+        panels = [("Ground truth", directory / "00_ground_truth.png")]
 
         print(f"{signal}: rendering {len(ranked)} reconstructions", flush=True)
         for rank, run in enumerate(ranked, start=1):
@@ -38,6 +39,13 @@ def qualitative(runs: list[dict], signals: list[str], out_dir: Path, device) -> 
                 rank, run["model"], "psnr", run["metrics"]["psnr"]
             )
             dataset.save(dataset.postprocess(output.cpu()), directory / name)
+            panels.append(
+                (
+                    f"{run['model']}\n{run['metrics']['psnr']:.2f} dB",
+                    directory / f"{name}.png",
+                )
+            )
+        report.montage(panels, directory / "comparison")
         print(f"{signal}: written to {directory}")
 
 
@@ -45,7 +53,7 @@ def main() -> None:
     args = report.parser("image", "image", "kodim17").parse_args()
     runs = report.read(args.log_dir, "image", args.models)
     summary = report.report(
-        runs, METRICS, args.out_dir, "image", per_signal=False, time_limit=10
+        runs, METRICS, args.out_dir, "image", per_signal=False, time_limit=15
     )
     print(summary.to_string())
     if args.qualitative != ["none"]:

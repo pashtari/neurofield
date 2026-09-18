@@ -47,7 +47,7 @@ def grid_plots(data: pd.DataFrame, metric: str, out_dir: Path) -> None:
     """IoU against rank at each number of components, and the other way round."""
     for basis, rows in data.groupby("basis"):
         for x, hue in (("rank", "components"), ("components", "rank")):
-            figure, plot = plt.subplots(figsize=(6, 4.5))
+            figure, plot = plt.subplots(figsize=(3.6, 3.0))
             sns.lineplot(
                 data=rows,
                 x=x,
@@ -58,7 +58,9 @@ def grid_plots(data: pd.DataFrame, metric: str, out_dir: Path) -> None:
                 dashes=False,
                 errorbar="se",
                 palette=list(report.RAMP[: rows[hue].nunique()]),
-                markersize=8,
+                markersize=5,
+                markeredgecolor="white",
+                markeredgewidth=0.5,
                 ax=plot,
             )
             labels = {"rank": "Rank $R$", "components": "Components $K$"}
@@ -72,7 +74,7 @@ def grid_plots(data: pd.DataFrame, metric: str, out_dir: Path) -> None:
             plot.set_xticks(sorted(rows[x].unique()))
             plot.set_xticklabels(sorted(rows[x].unique()))
             plot.xaxis.set_minor_locator(ticker.NullLocator())
-            plot.legend(title=labels[hue].split()[-1], fontsize=9)
+            plot.legend(title=labels[hue].split()[-1], frameon=False)
             report.save(figure, out_dir / f"{metric}_vs_{x}_{basis}")
 
 
@@ -85,7 +87,7 @@ def study(
     summary = report.table(data, metrics, out_dir, report.SPEED["occupancy"])
     if plots:
         report.convergence(
-            report.curves(chosen), metrics, out_dir, list(summary.index), time_limit=10
+            report.curves(chosen), metrics, out_dir, list(summary.index), time_limit=15
         )
     return summary
 

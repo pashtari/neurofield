@@ -63,7 +63,7 @@ models:
       hidden_features: 180
       hidden_layers: 3
       omega: 30.0
-    train: {lr: 2.0e-4}  # 1e-3 costs 3.7 dB on lego
+    train: {lr: 3.0e-4}  # on lego, 1e-4 costs 0.4 dB and 1e-3 about 4
 
   Gauss:
     class: Gauss
@@ -88,7 +88,7 @@ models:
       hidden_features: 180
       hidden_layers: 3
       omega: 30.0
-    train: {lr: 2.0e-4}  # 1e-3 costs 5.7 dB on lego
+    train: {lr: 3.0e-4}  # on lego, 1e-4 costs 0.5 dB and 1e-3 about 6
 
   Instant-NGP:  # instant-ngp density network, paper hash grid
     class: InstantNGP

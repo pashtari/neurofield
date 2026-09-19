@@ -1,9 +1,8 @@
-# FUTON ablations on the occupancy task:
-#     scripts/train_occupancy.py --config configs/ablation_futon.yaml \
-#         --log-dir logs/ablation-futon
-# The settings repeat configs/occupancy.yaml, and the default model is the
-# benchmark's: K = 128 components, CP rank 218 and a one-layer MLP decoder
-# (131,673 parameters).
+# FUTON ablation on the occupancy task: components K against CP rank R, both
+# over {32, 64, 128, 256}, for the cosine, lanczos and sinc bases and the
+# benchmark's one-layer MLP decoder.
+#     python scripts/train_occupancy.py --config configs/ablation-futon/components_rank.yaml
+# The data and training settings repeat configs/occupancy.yaml.
 
 data:
   resolution: 256
@@ -17,62 +16,6 @@ train:
   seed: 0
 
 models:
-  # Bases, at the default size.
-  FUTON-cosine:
-    class: FUTON
-    kwargs:
-      basis: [cosine, {num_components: 128, grid_size: 256}]
-      combiner: [cp, {rank: 218}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-lanczos:
-    class: FUTON
-    kwargs:
-      basis: [lanczos, {num_components: 128, radius: 3}]
-      combiner: [cp, {rank: 218}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-sinc:
-    class: FUTON
-    kwargs:
-      basis: [sinc, {num_components: 128, grid_size: 256}]
-      combiner: [cp, {rank: 218}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-triangle:
-    class: FUTON
-    kwargs:
-      basis: [triangle, {num_components: 128}]
-      combiner: [cp, {rank: 218}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-chebyshev:
-    class: FUTON
-    kwargs:
-      basis: [chebyshev, {num_components: 128}]
-      combiner: [cp, {rank: 218}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-legendre:
-    class: FUTON
-    kwargs:
-      basis: [legendre, {num_components: 128}]
-      combiner: [cp, {rank: 218}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  # Components K against rank R.
   FUTON-cosine-K32-R32:
     class: FUTON
     kwargs:
@@ -501,35 +444,6 @@ models:
     kwargs:
       basis: [sinc, {num_components: 256, grid_size: 256}]
       combiner: [cp, {rank: 256}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  # A tensor-ring combiner against the default CP one, at the same K. Rank 15
-  # comes closest in size: 137,476 parameters against 131,673.
-  FUTON-cosine-TR:
-    class: FUTON
-    kwargs:
-      basis: [cosine, {num_components: 128, grid_size: 256}]
-      combiner: [tr, {rank: 15}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-lanczos-TR:
-    class: FUTON
-    kwargs:
-      basis: [lanczos, {num_components: 128, radius: 3}]
-      combiner: [tr, {rank: 15}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-sinc-TR:
-    class: FUTON
-    kwargs:
-      basis: [sinc, {num_components: 128, grid_size: 256}]
-      combiner: [tr, {rank: 15}]
       decoder: [mlp, {hidden_layers: 1}]
       output_activation: tanh
     train: {lr: 1.0e-2}

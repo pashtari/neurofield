@@ -93,6 +93,46 @@ def test_image_training_evaluation_and_checkpoint(tmp_path, quantize):
         )
 
 
+@pytest.mark.parametrize(
+    "device",
+    [
+        "cpu",
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="requires CUDA"
+            ),
+        ),
+    ],
+)
+def test_dip_training_keeps_data_on_device(device):
+    torch.manual_seed(0)
+    image = torch.randint(256, (3, 8, 8), dtype=torch.uint8)
+    dataset = nf.DIPImageDataset(image, noise_shape=(4, 16, 16))
+    model = nf.DIPSkip(
+        4, 3, down_channels=[4, 4], up_channels=[4, 4], skip_channels=[2, 2]
+    )
+
+    def loss_fn(batch, model):
+        target = batch["target"]
+        output = torch.nn.functional.interpolate(
+            model(batch["input"]),
+            size=target.shape[-2:],
+            mode="bicubic",
+            antialias=True,
+        )
+        mse = torch.nn.functional.mse_loss(output, target)
+        return mse, {"mse": mse.item()}
+
+    results = nf.train(
+        model, dataset, loss_fn=loss_fn, num_epochs=4, eval_interval=-1, device=device
+    )
+
+    assert len(results["history"]) == 4
+    assert dataset.input.device.type == dataset.target.device.type == device
+    assert dataset.original.device.type == "cpu"
+
+
 def test_arithmetic_coding_preserves_bitstream():
     # This stream exercises unequal alphabets and deferred bits.
     pmfs = [[0.7, 0.3], [0.1, 0.2, 0.7], [0.4, 0.6], [0.5, 0.5]]

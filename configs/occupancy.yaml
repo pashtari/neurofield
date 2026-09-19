@@ -28,7 +28,7 @@ models:
       num_frequencies: 256
       sigma: 6.0  # sigma 12 on [0, 1] coordinates equals 6 on [-1, 1]
       output_activation: tanh
-    train: {lr: 5.0e-4}
+    train: {lr: 1.0e-3}  # 3e-4 costs 1.7 IoU points
 
   PE-MLP:  # FINER benchmark architecture
     class: PEMLP
@@ -58,7 +58,7 @@ models:
       hidden_layers: 3
       omega: 30.0
       output_activation: tanh
-    train: {lr: 5.0e-4}  # the SDF lr 1e-4 is too slow for 2000 epochs; image lr used
+    train: {lr: 1.0e-3}  # the SDF lr 1e-4 is too slow for 2000 epochs; 3e-3 is worse
 
   Gauss:  # FINER benchmark
     class: Gauss
@@ -86,7 +86,7 @@ models:
       hidden_layers: 3
       omega: 30.0
       output_activation: tanh
-    train: {lr: 5.0e-4}  # the SDF lr 1e-4 is too slow for 2000 epochs; image lr used
+    train: {lr: 1.0e-3}  # the SDF lr 1e-4 is too slow for 2000 epochs; 3e-3 is worse
 
   Instant-NGP:  # instant-ngp configs/volume/base.json architecture
     class: InstantNGP

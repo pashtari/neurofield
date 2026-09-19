@@ -23,6 +23,7 @@ To collect results::
 import argparse
 import gc
 import json
+import re
 import sys
 import traceback
 from collections.abc import Callable, Sequence
@@ -48,6 +49,17 @@ def build(model: dict[str, Any]) -> tuple[type[torch.nn.Module], dict[str, Any]]
     if "output_activation" in kwargs:
         kwargs["output_activation"] = getattr(torch, kwargs["output_activation"])
     return getattr(nf, model["class"]), kwargs
+
+
+def resolve(value: Any, **sizes: int) -> Any:
+    """Evaluate size expressions such as ``"max(H, W) // 2"``, recursively."""
+    if isinstance(value, dict):
+        return {key: resolve(item, **sizes) for key, item in value.items()}
+    if isinstance(value, list):
+        return [resolve(item, **sizes) for item in value]
+    if isinstance(value, str) and re.fullmatch(r"[HW\d\s()+\-*/,max]+", value):
+        return eval(value, {"__builtins__": {}, "max": max}, sizes)
+    return value
 
 
 def default_log_dir(config: Path) -> Path:

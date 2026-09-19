@@ -536,7 +536,8 @@ class DIPImageDataset(Dataset):
     """An image paired with fixed noise for Deep Image Prior (Ulyanov et al., 2018).
 
     Items contain ``id``, noise ``input``, float ``target`` in ``[0, 1]`` and
-    uint8 ``_original``. Target and original both have shape ``(C, H, W)``.
+    uint8 ``_original``. Target and original both have shape ``(C, H, W)``; the
+    input may be larger than the target, e.g. for super-resolution.
 
     Args:
         image: Path, PIL image (converted to RGB), or uint8 ``(C, H, W)`` tensor.
@@ -563,15 +564,24 @@ class DIPImageDataset(Dataset):
 
         noise_shape = noise_shape or (noise_channels, *self.original.shape[1:])
         generator = torch.Generator().manual_seed(seed)
-        self.noise = torch.randn(noise_shape, generator=generator) * 0.1
+        self.input = torch.randn(noise_shape, generator=generator) * 0.1
 
         self.reg_noise_std = reg_noise_std
+
+    def to(self, device: str | torch.device) -> Self:
+        """Move input and target to ``device`` in place and return this dataset.
+
+        The regularizing noise is then drawn on ``device`` as well. The
+        reference ``original`` stays on the CPU.
+        """
+        self.input, self.target = self.input.to(device), self.target.to(device)
+        return self
 
     def __len__(self) -> int:
         return 1
 
     def __getitem__(self, index: int) -> dict[str, Any]:
-        noise = self.noise
+        noise = self.input
         if self.reg_noise_std > 0:
             noise = noise + torch.randn_like(noise) * self.reg_noise_std
         return {

@@ -152,7 +152,7 @@ python scripts/train_nerf.py        # Blender scenes     -> logs/nerf/<scene>/<m
 
 `--data`, `--models`, `--device`, `--log-dir`, and `--config` select the signals, models, device, output directory, and config, e.g. `python scripts/train_image.py --data data/Kodak/kodim01.png --models SIREN FINER --device cuda:1`. By default, the scripts use every signal found under `data/`. Finished runs are skipped, so an interrupted sweep can simply be restarted; a failed run writes `error.txt` and the sweep continues.
 
-The YAML configs hold the shared data and training settings and, per model, its `neurofield` class, constructor arguments, and training overrides (e.g. the learning rate). Image configs may use size expressions in the image height `H` and width `W`, such as `max(H, W) // 2`.
+The YAML configs hold the shared data and training settings and, per model, its `neurofield` class, constructor arguments, and training overrides (e.g. the learning rate). Image configs may use size expressions in the image height `H` and width `W`, such as `max(H, W) // 2`. Learning rates are drawn from {3e-1, 1e-1, 3e-2, 1e-2, 3e-3, 1e-3, 3e-4, 1e-4}.
 
 The runs of `configs/<name>.yaml` go to `logs/<name>/`. Runs are keyed by model name, so variants of a model need their own names or their own `--log-dir`. `configs/ablation-futon/` holds the three FUTON ablations on the occupancy task: the basis, components against rank, and the tensor network. `--set` overrides a single value, and `--overwrite` reruns finished runs instead of skipping them:
 

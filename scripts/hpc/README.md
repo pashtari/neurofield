@@ -72,8 +72,15 @@ minutes and does the following:
    - the 8 Blender scenes to `data/nerf/blender/` (about 2.4 GB).
 
 The script is safe to rerun: existing files are kept. Rerun it after changing
-dependencies in `pyproject.toml`. The venv and data take about 13 GB of the
-`$VSC_DATA` quota.
+dependencies in `pyproject.toml`. The venv takes about 7 GB of the 25 GB
+`$VSC_DATA` quota. The data (about 4 GB) and the logs live in
+`$VSC_SCRATCH/neurofield/` instead, linked from the repository as `data/` and
+`logs/`; to set up a new clone that way:
+
+```bash
+mkdir -p $VSC_SCRATCH/neurofield/{data,logs}
+ln -s $VSC_SCRATCH/neurofield/data $VSC_SCRATCH/neurofield/logs $VSC_DATA/projects/neurofield/
+```
 
 For an interactive shell on the cluster, run
 `source $VSC_DATA/venvs/neurofield-env/bin/activate`. Login nodes limit each

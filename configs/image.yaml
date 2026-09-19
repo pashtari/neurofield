@@ -55,7 +55,7 @@ models:
       hidden_layers: 4
       omega: 30.0
       output_activation: tanh
-    train: {lr: 5.0e-4}
+    train: {lr: 1.0e-3}  # 3e-4 costs 1.9 dB; 3e-3 diverges
 
   Gauss:  # FINER image benchmark
     class: Gauss
@@ -85,7 +85,7 @@ models:
       hidden_layers: 4
       omega: 30.0
       output_activation: tanh
-    train: {lr: 5.0e-4}
+    train: {lr: 1.0e-3}  # 3e-4 costs 1.9 dB; 3e-3 diverges
 
   Instant-NGP:  # instant-ngp configs/image/base.json
     class: InstantNGP

@@ -145,9 +145,9 @@ Measured on A100s (2000 epochs; NeRF 37,500 steps), a run takes about:
 
 | Task | Per model | Per signal | Whole sweep |
 | --- | --- | --- | --- |
-| image | 37 s | 8 min (13 models) | 3.5 h (24 images) |
-| occupancy | 19 s | 4 min (14 models) | 25 min (5 shapes) |
-| nerf | 10 min | 2.5 h (14 models) | 20 h (8 scenes) |
+| image | 37 s | 7.5 min (12 models) | 3 h (24 images) |
+| occupancy | 19 s | 4 min (13 models) | 20 min (5 shapes) |
+| nerf | 10 min | 2.2 h (13 models) | 18 h (8 scenes) |
 
 Training a model takes about 17 s in the image and occupancy tasks; the image
 figure is higher because of the 20 LPIPS evaluations. The NeRF figure includes
@@ -173,7 +173,7 @@ mix freely.
 
 ### Image representation
 
-All 13 models on the 24 Kodak images, written to `logs/image/<image>/<model>/`.
+All 12 models on the 24 Kodak images, written to `logs/image/<image>/<model>/`.
 One job per image (about 9 minutes each) instead of one 3.5-hour job:
 
 ```bash
@@ -184,7 +184,7 @@ done
 
 ### Occupancy
 
-All 14 models on the 5 Stanford shapes, written to
+All 13 models on the 5 Stanford shapes, written to
 `logs/occupancy/<shape>/<model>/`. One job per shape (about 5 minutes each):
 
 ```bash
@@ -195,14 +195,14 @@ done
 
 ### NeRF
 
-All 14 models on the 8 Blender scenes, with 37,500 steps per model. This is by
-far the longest task: one job per scene and model (about 10 minutes each, 112
+All 13 models on the 8 Blender scenes, with 37,500 steps per model. This is by
+far the longest task: one job per scene and model (about 10 minutes each, 104
 jobs) queues better than one job per scene. Runs are written to
 `logs/nerf/<scene>/<model>/`:
 
 ```bash
 models="RFF PE-MLP MFN SIREN Gauss WIRE FINER Instant-NGP TensoRF-CP TensoRF-VM
-        GA-Planes FUTON-cosine FUTON-sinc FUTON-lanczos"
+        GA-Planes FUTON-sinc FUTON-lanczos"
 for scene in data/nerf/blender/*/; do
   for model in $models; do
     scripts/hpc/train.sh --clusters=accelgor nerf --data "$scene" --models "$model"
@@ -210,7 +210,7 @@ for scene in data/nerf/blender/*/; do
 done
 ```
 
-Submitting 112 jobs opens 112 SSH connections; either set up `ControlMaster`
+Submitting 104 jobs opens 104 SSH connections; either set up `ControlMaster`
 (step 1) or run the loop on a login node.
 
 ### Splitting and resuming

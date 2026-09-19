@@ -261,6 +261,29 @@ def y_range(
     return low - margin, high + margin
 
 
+def within_signal(data: pd.DataFrame, metric: str) -> pd.Series:
+    """A metric with each signal's own level removed, keeping the model means.
+
+    Signals differ far more in difficulty than models do, so a standard error
+    over signals mostly measures the signals. Subtracting each signal's mean
+    over models at every evaluation, and adding back the overall mean, leaves
+    each model's mean curve unchanged while its spread shows only how
+    consistently it scores relative to the others: the within-subject standard
+    error of Cousineau (2005), with the correction of Morey (2008).
+    """
+    step = ["signal", "iteration"]
+    cell = [data["model"], data["iteration"]]
+    centered = (
+        data[metric]
+        - data.groupby(step)[metric].transform("mean")
+        + data.groupby("iteration")[metric].transform("mean")
+    )
+    mean = centered.groupby(cell).transform("mean")
+    models = data["model"].nunique()
+    correction = (models / (models - 1)) ** 0.5 if models > 1 else 1.0
+    return mean + (centered - mean) * correction
+
+
 def convergence(
     data: pd.DataFrame,
     metrics: Sequence[str],
@@ -270,10 +293,10 @@ def convergence(
 ) -> None:
     """Plot each metric against iteration and against time, averaged over signals.
 
-    The band is one standard error of the mean over the signals. Each
-    evaluation is placed at the elapsed time averaged over signals, so that
-    seaborn groups the signals of an evaluation together. ``time_limit`` crops
-    the time axis, where the slowest models would squeeze the rest.
+    The band is one within-signal standard error (see :func:`within_signal`).
+    Each evaluation is placed at the elapsed time averaged over signals, so
+    that seaborn groups the signals of an evaluation together. ``time_limit``
+    crops the time axis, where the slowest models would squeeze the rest.
     """
     models = list(models or order(data, metrics[0]))
     palette = {m: PALETTE[i % len(PALETTE)] for i, m in enumerate(models)}
@@ -283,10 +306,11 @@ def convergence(
     )
 
     for metric in metrics:
+        banded = data.assign(**{metric: within_signal(data, metric)})
         for axis, label in (("iteration", "Iteration"), ("time", "Time (s)")):
             figure, plot = plt.subplots()
             sns.lineplot(
-                data=data,
+                data=banded,
                 x=axis,
                 y=metric,
                 hue="model",

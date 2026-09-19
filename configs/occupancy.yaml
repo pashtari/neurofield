@@ -140,15 +140,6 @@ models:
       output_activation: tanh
     train: {lr: 3.0e-2}
 
-  FUTON-cosine:
-    class: FUTON
-    kwargs:
-      basis: [cosine, {num_components: 128, grid_size: 256}]
-      combiner: [cp, {rank: 218}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
   FUTON-sinc:
     class: FUTON
     kwargs:

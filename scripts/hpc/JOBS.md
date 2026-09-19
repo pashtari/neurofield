@@ -11,9 +11,9 @@ Every model of `configs/<task>.yaml` on every signal of the task:
 
 | Task | Runs | Time | Logs |
 | --- | --- | --- | --- |
-| image | 24 Kodak images x 13 models = 312 | ~3.5 h | `logs/image/<image>/<model>/` |
-| occupancy | 5 Stanford shapes x 14 models = 70 | ~25 min | `logs/occupancy/<shape>/<model>/` |
-| nerf | 8 Blender scenes x 14 models = 112 | ~2.5 h per scene | `logs/nerf/<scene>/<model>/` |
+| image | 24 Kodak images x 12 models = 288 | ~3.5 h | `logs/image/<image>/<model>/` |
+| occupancy | 5 Stanford shapes x 13 models = 65 | ~25 min | `logs/occupancy/<shape>/<model>/` |
+| nerf | 8 Blender scenes x 13 models = 104 | ~2.5 h per scene | `logs/nerf/<scene>/<model>/` |
 
 ```bash
 scripts/hpc/train.sh --clusters=accelgor --time=5:00:00 image
@@ -34,17 +34,17 @@ CP rank 218 and a one-layer MLP decoder (131,673 parameters).
 | Study | Models | What varies |
 | --- | --- | --- |
 | `basis` | `FUTON-<basis>`, 6 | cosine, lanczos, sinc, triangle, chebyshev and legendre, at the default size |
-| `components_rank` | `FUTON-<basis>-K<K>-R<R>`, 48 | K and R over {32, 64, 128, 256}, for cosine, lanczos and sinc |
-| `tensor_net` | `FUTON-<basis>` and `FUTON-<basis>-TR`, 6 | a tensor-ring combiner against the default CP one, at K=128, for cosine, lanczos and sinc |
+| `components_rank` | `FUTON-<basis>-K<K>-R<R>`, 32 | K and R over {32, 64, 128, 256}, for lanczos and sinc |
+| `tensor_net` | `FUTON-<basis>` and `FUTON-<basis>-TR`, 4 | a tensor-ring combiner against the default CP one, at K=128, for lanczos and sinc |
 
 A tensor ring of rank `r` has the size of a CP combiner of rank `r^2`; rank 15
 gives 137,476 parameters, the closest to the CP model's 131,673. The CP models
 of `tensor_net` repeat those of `basis`, so that each study stands alone. A run
-takes about 25 s, so the 300 runs (60 models x 5 shapes) take about two hours:
+takes about 25 s, so the 210 runs (42 models x 5 shapes) take about 1.5 hours:
 
 ```bash
 scripts/hpc/train.sh --clusters=accelgor occupancy --config configs/ablation-futon/basis.yaml
-scripts/hpc/train.sh --clusters=accelgor --time=3:00:00 occupancy \
+scripts/hpc/train.sh --clusters=accelgor --time=2:00:00 occupancy \
   --config configs/ablation-futon/components_rank.yaml
 scripts/hpc/train.sh --clusters=accelgor occupancy --config configs/ablation-futon/tensor_net.yaml
 ```
@@ -77,6 +77,7 @@ python scripts/report_image.py          # -> results/image/
 python scripts/report_occupancy.py      # -> results/occupancy/
 python scripts/report_nerf.py           # -> results/nerf/
 python scripts/report_ablation.py       # -> results/ablation-futon/<study>/
+python scripts/report_paper.py          # -> results/paper/
 ```
 
 Each task report writes:
@@ -89,6 +90,26 @@ Each task report writes:
 - qualitative examples rebuilt from the checkpoints for the signals that
   `--qualitative` names (`none` skips them), each signal's also composed into
   one `comparison.pdf`.
+
+`report_paper.py` writes the paper's figures and tables, one per task for
+LaTeX subfigures, in `results/paper/<task>/`:
+- quality against training time, on log axes, for FUTON and the strongest
+  model of each other family; IoU is drawn on the log of its error, so that
+  each tenfold reduction takes the same height;
+- every model's final quality against its training time, and against its
+  inference rate;
+- one table per task of every model's size, training time and final metrics,
+  one row per model, with the best in bold and the second underlined. The
+  averages carry one standard error over the signals, taken once each
+  signal's own level is removed. The occupancy table also gives each shape's
+  IoU, and the NeRF one every scene's metrics under a super column, which
+  takes a page turned sideways.
+
+The figures and tables carry one TensoRF, the default variant for the
+dimension: CP in 2D, where it is the only one, and VM in 3D. The per-task
+reports keep both.
+
+A shared `legend.pdf` sits beside the task folders.
 
 The ablation report writes the same table for each study, with convergence
 plots for `basis`, IoU against R at each K and against K at each R for

@@ -163,13 +163,14 @@ python scripts/train_image.py --set models.SIREN.train.lr=0.001 --log-dir logs/s
 
 Each run directory holds `log.txt`, `log.json`, `checkpoint.pt`, the final reconstruction (NeRF: selected test views), and `results.json` with the model setup, parameter count, training time, final metrics (NeRF: all 200 test views), and training history.
 
-`scripts/report_<task>.py` turns those runs into `results/<task>/`: one table (CSV, Markdown, LaTeX) of every model, opening with its size, times and each metric averaged over the signals as `mean±std`, followed by one super column per signal holding that signal's metrics; convergence plots of each metric against iteration and against time, averaged over signals with a standard-error band, written as PDF and as PGF to include in a LaTeX document; and qualitative examples rebuilt from the checkpoints — reconstructed images, meshes and renders, or novel views and an orbit GIF, each named by rank, model and score, and composed into one `comparison.pdf`. `scripts/report_ablation.py` does the same for the FUTON ablations, plus the components and rank grid.
+`scripts/report_<task>.py` turns those runs into `results/<task>/`: one table (CSV, Markdown, LaTeX) of every model, opening with its size, times and each metric averaged over the signals as `mean±std`, followed by one super column per signal holding that signal's metrics; convergence plots of each metric against iteration and against time, averaged over signals with a within-signal standard-error band, written as PDF and as PGF to include in a LaTeX document; and qualitative examples rebuilt from the checkpoints — reconstructed images, meshes and renders, or novel views and an orbit GIF, each named by rank, model and score, and composed into one `comparison.pdf`. `scripts/report_ablation.py` does the same for the FUTON ablations, plus the components and rank grid.
 
 ```bash
 python scripts/report_image.py
 python scripts/report_occupancy.py --qualitative lucy thai_statue
 python scripts/report_nerf.py --qualitative lego --frames 60
 python scripts/report_ablation.py
+python scripts/report_paper.py      # the paper's figures and tables, per task
 ```
 
 Or read the runs directly:

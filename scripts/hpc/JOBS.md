@@ -80,6 +80,21 @@ python scripts/report_ablation.py       # -> results/ablation-futon/<study>/
 python scripts/report_paper.py          # -> results/paper/
 ```
 
+Timings from the sweeps carry whatever else shared the node, so measure speed
+in one exclusive job instead, which also retrains one signal per task to time
+training without neighbours:
+
+```bash
+sbatch --clusters=accelgor --exclusive --time=3:00:00 --gpus-per-node=1 \
+  --cpus-per-task=12 --chdir=$VSC_DATA/projects/neurofield \
+  --output=logs/slurm/%x-%j.out --job-name=nf-speed --wrap \
+  "source $VSC_DATA/venvs/neurofield-env/bin/activate \
+   && python scripts/profile_speed.py \
+   && python scripts/train_image.py --data data/Kodak/kodim17.png --overwrite --log-dir logs/timing/image \
+   && python scripts/train_occupancy.py --data data/occupancy/lucy.ply --overwrite --log-dir logs/timing/occupancy \
+   && python scripts/train_nerf.py --data data/nerf/blender/lego --overwrite --log-dir logs/timing/nerf"
+```
+
 Each task report writes:
 
 - a table of the models (CSV, Markdown and LaTeX): their size, training time,

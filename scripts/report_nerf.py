@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Report the NeRF benchmark: table, convergence plots, and example renders.
 
 Usage:
@@ -14,11 +13,11 @@ display, so this also runs on a compute node.
 from pathlib import Path
 
 import numpy as np
+import report_common as report
 import torch
 from PIL import Image
 
 import neurofield as nf
-import report_common as report
 
 METRICS = ("psnr", "ssim", "lpips")
 
@@ -109,7 +108,7 @@ def qualitative(
 
 
 def main() -> None:
-    parser = report.parser("nerf", "nerf", "lego")
+    parser = report.parser("nerf", "nerf", report.EXAMPLE["nerf"])
     parser.add_argument(
         "--frames", type=int, default=60, help="orbit frames; 0 skips the orbits"
     )

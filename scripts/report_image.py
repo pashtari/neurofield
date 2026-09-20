@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Report the image benchmark: table, convergence plots, and example images.
 
 Usage:
@@ -12,8 +11,9 @@ model's reconstruction, named by rank, model and PSNR.
 
 from pathlib import Path
 
-import neurofield as nf
 import report_common as report
+
+import neurofield as nf
 
 METRICS = ("psnr", "ssim", "ms_ssim", "lpips")
 
@@ -49,7 +49,7 @@ def qualitative(runs: list[dict], signals: list[str], out_dir: Path, device) -> 
 
 
 def main() -> None:
-    args = report.parser("image", "image", "kodim17").parse_args()
+    args = report.parser("image", "image", report.EXAMPLE["image"]).parse_args()
     runs = report.read(args.log_dir, "image", args.models)
     summary = report.report(
         runs, METRICS, args.out_dir, "image", per_signal=False, time_limit=15

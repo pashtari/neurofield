@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """The paper's figures and tables, one of each per task for LaTeX subfigures.
 
 Usage:
@@ -25,6 +24,7 @@ from itertools import groupby
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import report_common as report
 import seaborn as sns
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
@@ -34,8 +34,6 @@ from matplotlib.ticker import (
     NullFormatter,
     StrMethodFormatter,
 )
-
-import report_common as report
 
 # FUTON in one hue, sinc solid and lanczos dashed, and the strongest model of
 # each other family: periodic activations (FINER), hash grids (Instant-NGP)
@@ -60,7 +58,6 @@ TASKS = {
     "occupancy": ("fraction", "IoU (%)", "logit", ("iou",)),
     "nerf": ("psnr", "PSNR (dB)", "linear", ("psnr", "ssim", "lpips")),
 }
-SCALES: dict[str, tuple] = {}  # custom scales, as forward and inverse functions
 ROWS = (
     "RFF", "PE-MLP", "MFN", "SIREN", "Gauss", "WIRE", "FINER", "Instant-NGP",
     "TensoRF", "GA-Planes", "FUTON-sinc", "FUTON-lanczos",
@@ -109,7 +106,7 @@ def nice_ticks(plot: Axes) -> None:
         (plot.xaxis, plot.get_xlim()),
         (plot.yaxis, plot.get_ylim()),
     ):
-        if axis.get_scale() in ("logit", "function"):
+        if axis.get_scale() == "logit":
             ticks = [tick for tick in LOGIT_TICKS if low <= tick <= high]
             axis.set_major_formatter(FuncFormatter(lambda value, _: f"{100 * value:g}"))
         elif axis.get_scale() == "log":
@@ -130,19 +127,12 @@ def nice_ticks(plot: Axes) -> None:
         axis.set_minor_formatter(NullFormatter())
 
 
-def scaled(plot: Axes, scale: str) -> None:
-    """Set the y scale, which for a custom one carries its own functions."""
-    plot.set_yscale(*(("function",) if scale in SCALES else (scale,)),
-                    **({"functions": SCALES[scale]} if scale in SCALES else {}))  # fmt: skip
-
-
 def limits(means: pd.DataFrame, metric: str, scale: str) -> tuple[float, float]:
     """A y range on which the models separate, found in the axis' own scale."""
-    identity = (lambda value: value,) * 2
-    forward, inverse = SCALES.get(scale) or {
+    forward, inverse = {
         "log": (np.log10, lambda v: 10**v),
         "logit": (lambda p: np.log(p / (1 - p)), lambda v: 1 / (1 + np.exp(-v))),
-    }.get(scale, identity)
+    }.get(scale, (lambda value: value,) * 2)
     found = report.y_range(
         means.assign(mean=forward(means[metric])).reset_index(), "iteration", True
     )
@@ -187,9 +177,9 @@ def convergence(curves: pd.DataFrame, task: str) -> plt.Figure:
     low, high = limits(means, metric, scale)
     shown = means[means[metric].between(low, high)]["time"]
     # Scaled after plotting, since seaborn would average in the axis' scale.
-    scaled(plot, scale)
     plot.set(
         xscale="log",
+        yscale=scale,
         xlim=(shown.min() / 1.1, means["time"].max() * 1.1),
         ylim=(low, high),
         xlabel="Training time (s)",
@@ -210,9 +200,9 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
     rest = final[~final["model"].isin(FEATURED)]
     others = rest.groupby("model")[[cost, metric]].mean()
     figure, plot = plt.subplots(figsize=SIZE)
-    scaled(plot, scale)
     plot.set(
         xscale="log",
+        yscale=scale,
         xlim=(final[cost].min() / 1.15, final[cost].max() * 1.15),
         xlabel=axis,
         ylabel=label,

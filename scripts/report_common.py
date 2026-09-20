@@ -13,12 +13,11 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pgf import LatexError
 import pandas as pd
 import seaborn as sns
 import torch
 import yaml
-
+from matplotlib.backends.backend_pgf import LatexError
 from train_common import ROOT, build, merge
 
 # Header, whether larger is better, the factor the stored value is shown in,
@@ -52,6 +51,11 @@ SIGNALS = {  # where a run's signal lives, by task
     "occupancy": "data/occupancy/{}.ply",
     "nerf": "data/nerf/blender/{}",
 }
+EXAMPLE = {  # the signal the reports render, and the profiler times
+    "image": "kodim17",
+    "occupancy": "lucy",
+    "nerf": "lego",
+}
 
 
 def scale(metric: str, value: float) -> float:
@@ -75,7 +79,7 @@ def entry(metric: str, mean: float, deviation: float | None = None) -> str:
 
 
 def parser(report: str, default_log: str, signal: str) -> argparse.ArgumentParser:
-    """Command line shared by the reports."""
+    """Command line shared by the reports; ``signal`` is the example rendered."""
     parser = argparse.ArgumentParser(description=f"Report the {report} runs.")
     parser.add_argument("--log-dir", type=Path, default=ROOT / "logs" / default_log)
     parser.add_argument("--out-dir", type=Path, default=ROOT / "results" / report)

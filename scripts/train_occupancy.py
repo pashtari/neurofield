@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 import torch
+from train_common import ROOT, build, record, run
 
 import neurofield as nf
-from train_common import ROOT, build, record, run
 
 DATA = sorted((ROOT / "data" / "occupancy").glob("*.ply"))
 

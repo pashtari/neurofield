@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Report the FUTON ablations on the occupancy task.
 
 Usage:
@@ -23,12 +22,11 @@ import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import pandas as pd
+import report_common as report
 import seaborn as sns
 import yaml
-
-import report_common as report
+from matplotlib import ticker
 
 METRIC = "iou"
 STUDIES = ("basis", "components_rank", "tensor_net")
@@ -99,7 +97,9 @@ def grid_plots(runs: list[dict], out_dir: Path) -> None:
 
 
 def main() -> None:
-    args = report.parser("ablation-futon", "ablation-futon", "lucy").parse_args()
+    args = report.parser(
+        "ablation-futon", "ablation-futon", report.EXAMPLE["occupancy"]
+    ).parse_args()
     report.style()
     for study in STUDIES:
         runs = read(study, args.log_dir, args.models)

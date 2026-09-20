@@ -171,7 +171,12 @@ python scripts/report_occupancy.py --qualitative lucy thai_statue
 python scripts/report_nerf.py --qualitative lego --frames 60
 python scripts/report_ablation.py
 python scripts/report_paper.py      # the paper's figures and tables, per task
+python scripts/profile_speed.py     # -> results/speed/, inference timed in one job
 ```
+
+A run's recorded time carries whatever else shared its node, so
+`scripts/profile_speed.py` times every model's inference on one signal per
+task, in turn, for a single (ideally exclusive) job to run.
 
 Or read the runs directly:
 

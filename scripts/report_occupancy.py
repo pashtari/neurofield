@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Report the occupancy benchmark: table, convergence plots, and example shapes.
 
 Usage:
@@ -13,8 +12,9 @@ workstation; on a compute node only the .dae mesh is written.
 
 from pathlib import Path
 
-import neurofield as nf
 import report_common as report
+
+import neurofield as nf
 
 METRICS = ("iou",)
 
@@ -52,7 +52,9 @@ def qualitative(runs: list[dict], signals: list[str], out_dir: Path, device) -> 
 
 
 def main() -> None:
-    args = report.parser("occupancy", "occupancy", "lucy").parse_args()
+    args = report.parser(
+        "occupancy", "occupancy", report.EXAMPLE["occupancy"]
+    ).parse_args()
     runs = report.read(args.log_dir, "occupancy", args.models)
     summary = report.report(runs, METRICS, args.out_dir, "occupancy", time_limit=15)
     print(summary.to_string())

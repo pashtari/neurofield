@@ -14,7 +14,7 @@ Usage:
     python scripts/profile_speed.py
     python scripts/profile_speed.py --tasks image occupancy --repeats 9
 
-Writes results/speed/<task>.json: each model's median inference time over the
+Writes logs/speed/<task>.json: each model's median inference time over the
 repeats, the points it evaluated, and the rate those give.
 """
 
@@ -25,9 +25,9 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-import report_common as report
+import report_paper as report
 import torch
-from report_nerf import field_and_renderer
+from report_paper import field_and_renderer
 
 import neurofield as nf
 
@@ -110,9 +110,7 @@ def main() -> None:
     )
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--log-dir", type=Path, default=report.ROOT / "logs")
-    parser.add_argument(
-        "--out-dir", type=Path, default=report.ROOT / "results" / "speed"
-    )
+    parser.add_argument("--out-dir", type=Path, default=report.ROOT / "logs" / "speed")
     parser.add_argument(
         "--device", default="cuda" if torch.cuda.is_available() else "cpu"
     )
@@ -123,7 +121,7 @@ def main() -> None:
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     for task in args.tasks:
-        signal = report.EXAMPLE[task]
+        signal = report.EXAMPLES[task][0]
         path = report.ROOT / report.SIGNALS[task].format(signal)
         runs = [
             run

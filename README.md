@@ -154,7 +154,7 @@ python scripts/train_nerf.py        # Blender scenes     -> logs/nerf/<scene>/<m
 
 The YAML configs hold the shared data and training settings and, per model, its `neurofield` class, constructor arguments, and training overrides (e.g. the learning rate). Image configs may use size expressions in the image height `H` and width `W`, such as `max(H, W) // 2`. Learning rates are drawn from {3e-1, 1e-1, 3e-2, 1e-2, 3e-3, 1e-3, 3e-4, 1e-4}.
 
-The runs of `configs/<name>.yaml` go to `logs/<name>/`. Runs are keyed by model name, so variants of a model need their own names or their own `--log-dir`. `configs/ablation-futon/` holds the three FUTON ablations on the occupancy task: the basis, components against rank, and the tensor network. `--set` overrides a single value, and `--overwrite` reruns finished runs instead of skipping them:
+The runs of `configs/<name>.yaml` go to `logs/<name>/`. Runs are keyed by model name, so variants of a model need their own names or their own `--log-dir`. `configs/ablation-futon/` holds the four FUTON ablations on the occupancy task: the basis, components against rank, the tensor network, and the decoder. `--set` overrides a single value, and `--overwrite` reruns finished runs instead of skipping them:
 
 ```bash
 python scripts/train_occupancy.py --config configs/ablation-futon/basis.yaml  # -> logs/ablation-futon/basis/
@@ -163,16 +163,17 @@ python scripts/train_image.py --set models.SIREN.train.lr=0.001 --log-dir logs/s
 
 Each run directory holds `log.txt`, `log.json`, `checkpoint.pt`, the final reconstruction (NeRF: selected test views), and `results.json` with the model setup, parameter count, training time, final metrics (NeRF: all 200 test views), and training history.
 
-`scripts/report_<task>.py` turns those runs into `results/<task>/`: one table (CSV, Markdown, LaTeX) of every model, opening with its size, times and each metric averaged over the signals as `mean±std`, followed by one super column per signal holding that signal's metrics; convergence plots of each metric against iteration and against time, averaged over signals with a within-signal standard-error band, written as PDF and as PGF to include in a LaTeX document; and qualitative examples rebuilt from the checkpoints — reconstructed images, meshes and renders, or novel views and an orbit GIF, each named by rank, model and score, and composed into one `comparison.pdf`. `scripts/report_ablation.py` does the same for the FUTON ablations, plus the components and rank grid.
+`scripts/report_paper.py` turns those runs into `results/`, which holds the paper's figures and tables and nothing else. Per task: quality against training time for FUTON and the strongest model of each other family, with a within-signal standard-error band; every model's final quality against its training time and against its inference rate; one table of every model's size, training time and final metrics, the averages with a paired standard error, the best in bold and the second underlined; and, for each of two signals, that signal with two regions boxed and those regions magnified for every featured model, the regions found as the two squares of fine detail where FUTON gains most over the strongest baseline. Figures come as PDF and as PGF to include in a LaTeX document. The FUTON ablations add a table and a convergence plot of the bases, one table of the combiner and the decoder together, a convergence plot of the combiner, and IoU against the CP rank at each number of components and the other way round.
 
 ```bash
-python scripts/report_image.py
-python scripts/report_occupancy.py --qualitative lucy thai_statue
-python scripts/report_nerf.py --qualitative lego --frames 60
-python scripts/report_ablation.py
-python scripts/report_paper.py      # the paper's figures and tables, per task
-python scripts/profile_speed.py     # -> results/speed/, inference timed in one job
+python scripts/report_paper.py                   # everything, into results/
+python scripts/report_paper.py --tasks image --overwrite   # redraw one task's panels
+python scripts/report_paper.py --no-panels       # tables and plots, without a GPU
+python scripts/report_paper.py --orbit 60        # also an orbit GIF per NeRF model
+python scripts/profile_speed.py                  # -> logs/speed/, timed in one job
 ```
+
+The magnified panels are rebuilt from the checkpoints, which needs the signals in `data/` and a GPU, so they are kept in `results/<task>/panels/` and reused; `--overwrite` draws them again.
 
 A run's recorded time carries whatever else shared its node, so
 `scripts/profile_speed.py` times every model's inference on one signal per

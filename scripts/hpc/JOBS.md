@@ -36,17 +36,23 @@ CP rank 218 and a one-layer MLP decoder (131,673 parameters).
 | `basis` | `FUTON-<basis>`, 6 | cosine, lanczos, sinc, triangle, chebyshev and legendre, at the default size |
 | `components_rank` | `FUTON-<basis>-K<K>-R<R>`, 32 | K and R over {32, 64, 128, 256}, for lanczos and sinc |
 | `tensor_net` | `FUTON-<basis>` and `FUTON-<basis>-TR`, 4 | a tensor-ring combiner against the default CP one, at K=128, for lanczos and sinc |
+| `decoder` | `FUTON-<basis>`, `-linear` and `-linear-R218`, 6 | the paper's linear decoder against the benchmark's MLP, at equal size and at equal rank |
 
 A tensor ring of rank `r` has the size of a CP combiner of rank `r^2`; rank 15
-gives 137,476 parameters, the closest to the CP model's 131,673. The CP models
-of `tensor_net` repeat those of `basis`, so that each study stands alone. A run
-takes about 25 s, so the 210 runs (42 models x 5 shapes) take about 1.5 hours:
+gives 137,476 parameters, the closest to the CP model's 131,673. The MLP
+decoder holds 47,961 of those parameters, 36% of the model, which a linear
+decoder returns to the combiner as CP rank 342 (131,671 parameters); rank 218
+is kept as well, to separate the parameters from the nonlinearity. The CP
+models of `tensor_net` and `decoder` repeat those of `basis`, so that each
+study stands alone. A run takes about 25 s, so the 240 runs (48 models x 5
+shapes) take about 1.7 hours:
 
 ```bash
 scripts/hpc/train.sh --clusters=accelgor occupancy --config configs/ablation-futon/basis.yaml
 scripts/hpc/train.sh --clusters=accelgor --time=2:00:00 occupancy \
   --config configs/ablation-futon/components_rank.yaml
 scripts/hpc/train.sh --clusters=accelgor occupancy --config configs/ablation-futon/tensor_net.yaml
+scripts/hpc/train.sh --clusters=accelgor occupancy --config configs/ablation-futon/decoder.yaml
 ```
 
 ## Overrides
@@ -73,11 +79,8 @@ figures. Tables, plots and examples are made afterwards from the pulled logs:
 
 ```bash
 scripts/hpc/pull_logs.sh                # on the local machine
-python scripts/report_image.py          # -> results/image/
-python scripts/report_occupancy.py      # -> results/occupancy/
-python scripts/report_nerf.py           # -> results/nerf/
-python scripts/report_ablation.py       # -> results/ablation-futon/<study>/
-python scripts/report_paper.py          # -> results/paper/
+python scripts/report_paper.py          # -> results/, the paper's figures
+python scripts/report_paper.py --no-panels   # without the renders, which need a GPU
 ```
 
 Timings from the sweeps carry whatever else shared the node, so measure speed
@@ -95,49 +98,61 @@ sbatch --clusters=accelgor --exclusive --time=3:00:00 --gpus-per-node=1 \
    && python scripts/train_nerf.py --data data/nerf/blender/lego --overwrite --log-dir logs/timing/nerf"
 ```
 
-Each task report writes:
+`report_paper.py` writes everything the paper needs into `results/`, and
+nothing else. Per task, in `results/<task>/` so that each is a LaTeX
+subfigure:
 
-- a table of the models (CSV, Markdown and LaTeX): their size, training time,
-  inference speed and each metric averaged over the signals as `mean±std`,
-  then a super column per signal (image, with 24 signals, keeps the average);
-- convergence plots of each metric against iteration and against time, as PDF
-  and PGF;
-- qualitative examples rebuilt from the checkpoints for the signals that
-  `--qualitative` names (`none` skips them), each signal's also composed into
-  one `comparison.pdf`.
-
-`report_paper.py` writes the paper's figures and tables, one per task for
-LaTeX subfigures, in `results/paper/<task>/`:
-- quality against training time, on log axes, for FUTON and the strongest
-  model of each other family; IoU is drawn on the log of its error, so that
-  each tenfold reduction takes the same height;
+- quality against training time, for FUTON and the strongest model of each
+  other family, the band one within-signal standard error; time is logarithmic,
+  where the curves span more than a decade of it, and the metric linear;
 - every model's final quality against its training time, and against its
-  inference rate;
-- one table per task of every model's size, training time and final metrics,
-  one row per model, with the best in bold and the second underlined. The
-  averages carry one standard error over the signals, taken once each
-  signal's own level is removed. The occupancy table also gives each shape's
-  IoU, and the NeRF one every scene's metrics under a super column, which
-  takes a page turned sideways.
+  inference rate, both axes linear;
+- one table of every model's size, training time and final metrics, the best in
+  bold and the second underlined. The averages carry one standard error over
+  the signals, taken once each signal's own level is removed. The occupancy
+  table also gives each shape's IoU, and the NeRF one every scene's metrics
+  under a super column, which takes a page turned sideways;
+- for each of the task's example signals, that signal with two regions boxed,
+  each in its own colour, and those regions magnified for the ground truth and
+  every featured model, framed in the colour of their box. The regions are
+  found, not set: the two squares of fine detail where FUTON gains most
+  squared error over the strongest baseline, which puts the magnifications
+  where the models actually differ. `ZONES` restricts the search to a
+  rectangle per box where a signal's telling regions are not the ones the
+  search would reach, and a NeRF scene is rendered from the view where FUTON
+  gains most of those that show it whole, which every run records.
 
-The figures and tables carry one TensoRF, the default variant for the
-dimension: CP in 2D, where it is the only one, and VM in 3D. The per-task
-reports keep both.
+The magnified panels are rebuilt from the checkpoints, which needs the signals
+in `data/` and a GPU, so they are kept in `<task>/panels/<signal>/` and reused.
+`--overwrite` draws them again, which a changed NeRF view calls for, and
+`--no-panels` leaves them out. Meshes render offscreen, so no display is
+needed; a shape file that differs from the cluster's would rebuild the wrong
+mesh, which the report catches by recomputing each run's IoU.
 
-A shared `legend.pdf` sits beside the task folders.
+The figures carry one TensoRF, the default variant for the dimension: CP in 2D,
+where it is the only one, and VM in 3D. Four hues are as many as stay apart
+under every kind of colour blindness, so a hue names a family and the line
+style names the member, the stronger of a pair solid: SIREN and FINER share
+the periodic-activation hue, as do the two FUTON bases. A shared `legend.pdf`
+sits beside the task folders.
 
-The ablation report writes the same table for each study, with convergence
-plots for `basis`, IoU against R at each K and against K at each R for
-`components_rank`, and CP against TR for each basis for `tensor_net`.
+The FUTON ablations go to `results/ablation/`: `basis` as a table and a
+convergence plot, `combiner_decoder` as one table of the tensor ring and the
+linear decoder against the benchmark's CP and MLP, `tensor_net` as a
+convergence plot, and the components study as IoU against R at each K and
+against K at each R, one figure per basis.
 
-Rendering a mesh needs a display, so run the occupancy report on a
-workstation. NeRF renders need none and can run on the cluster:
+`--orbit 60` also saves an orbit GIF of each NeRF model beside its panel, for
+a talk. It costs about a minute a scene and the paper takes none of them, so
+it is off by default.
+
+The whole report runs on the cluster too, where the data sits beside the runs:
 
 ```bash
 sbatch --clusters=accelgor --time=1:00:00 --gpus-per-node=1 --cpus-per-task=8 \
   --chdir=$VSC_DATA/projects/neurofield --output=logs/slurm/%x-%j.out \
   --job-name=nf-report --wrap \
-  "source $VSC_DATA/venvs/neurofield-env/bin/activate && python scripts/report_nerf.py"
+  "source $VSC_DATA/venvs/neurofield-env/bin/activate && python scripts/report_paper.py"
 ```
 
 To read the runs directly instead:

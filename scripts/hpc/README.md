@@ -255,10 +255,10 @@ cluster's copy, so delete a local run directory to take the cluster's again.
 Each run directory contains `results.json` (settings, parameter count,
 training time, final metrics, and training history), `log.txt`, `log.json`,
 `checkpoint.pt`, and the reconstruction of an image or NeRF's selected test
-views. Occupancy runs write no mesh, since rendering one needs a display; the
-occupancy report rebuilds them from `checkpoint.pt`. `JOBS.md` shows how the
-reports turn the runs into tables, plots and examples; to load the runs
-directly:
+views. Occupancy runs write no mesh; the report rebuilds one from
+`checkpoint.pt` and renders it offscreen. `JOBS.md` shows how
+`report_paper.py` turns the runs into the paper's figures and tables; to load
+the runs directly:
 
 ```python
 records = [json.loads(p.read_text()) for p in Path("logs").rglob("results.json")]

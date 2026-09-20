@@ -5,8 +5,8 @@ Usage:
 
 Writes results/paper/:
     legend.{pdf,pgf}               the models' legend, shared by every figure
-    <task>/convergence.{pdf,pgf}   quality against training time, on log axes, for
-                                   FUTON and the strongest model of each other family
+    <task>/convergence.{pdf,pgf}   quality against training time, for FUTON and the
+                                   strongest model of each other family
     <task>/tradeoff.{pdf,pgf}      every model's final quality against its training time
     <task>/throughput.{pdf,pgf}    the same against its inference rate
     <task>/table.{tex,md}          every model's size, training time and final metrics,
@@ -26,14 +26,9 @@ import numpy as np
 import pandas as pd
 import report_common as report
 import seaborn as sns
-from matplotlib.axes import Axes
+from matplotlib.axis import Axis
 from matplotlib.lines import Line2D
-from matplotlib.ticker import (
-    FixedLocator,
-    FuncFormatter,
-    NullFormatter,
-    StrMethodFormatter,
-)
+from matplotlib.ticker import FixedLocator, NullFormatter, StrMethodFormatter
 
 # FUTON in one hue, sinc solid and lanczos dashed, and the strongest model of
 # each other family: periodic activations (FINER), hash grids (Instant-NGP)
@@ -50,20 +45,20 @@ OTHERS = "0.7"  # gray of every other model
 # only one, and VM in 3D, the one its authors recommend. The per-task reports
 # keep both.
 TENSORF = {"image": "TensoRF", "occupancy": "TensoRF-VM", "nerf": "TensoRF-VM"}
-# Per task, the metric plotted, its axis label and scale, and the metrics
-# tabulated. IoU is drawn on a logit axis, which expands the saturated end,
-# where 99.7% and 99.9% differ threefold in error, and keeps larger upwards.
+# Per task, the metric plotted, its axis label, and the metrics tabulated.
 TASKS = {
-    "image": ("psnr", "PSNR (dB)", "linear", ("psnr", "ssim", "lpips")),
-    "occupancy": ("fraction", "IoU (%)", "logit", ("iou",)),
-    "nerf": ("psnr", "PSNR (dB)", "linear", ("psnr", "ssim", "lpips")),
+    "image": ("psnr", "PSNR (dB)", ("psnr", "ssim", "lpips")),
+    "occupancy": ("iou", "IoU (%)", ("iou",)),
+    "nerf": ("psnr", "PSNR (dB)", ("psnr", "ssim", "lpips")),
 }
+# Metric axes are linear, which needs no explaining; IoU saturates, so its
+# curves start here instead, which the ticks show plainly.
+FLOOR = {"occupancy": 99.0}
 ROWS = (
     "RFF", "PE-MLP", "MFN", "SIREN", "Gauss", "WIRE", "FINER", "Instant-NGP",
     "TensoRF", "GA-Planes", "FUTON-sinc", "FUTON-lanczos",
 )  # fmt: skip
 TARGET = 99.8  # IoU (%) whose first time the occupancy table reports
-LOGIT_TICKS = (0.9, 0.95, 0.98, 0.99, 0.995, 0.998, 0.999, 0.9995, 0.9999)
 SIZE = (2.3, 1.9)  # inches, a third of a two-column page with gutters
 
 
@@ -75,10 +70,7 @@ def load(task: str) -> tuple[pd.DataFrame, pd.DataFrame]:
         # One TensoRF, the task's default variant.
         others = {"TensoRF", "TensoRF-CP", "TensoRF-VM"} - {TENSORF[task]}
         frame = frame[~frame["model"].isin(others)]
-        frame = frame.replace({"model": {TENSORF[task]: "TensoRF"}})
-        if "iou" in frame:
-            frame["fraction"] = frame["iou"] / 100
-        frames.append(frame)
+        frames.append(frame.replace({"model": {TENSORF[task]: "TensoRF"}}))
     return tuple(frames)
 
 
@@ -96,47 +88,23 @@ def featured(frame: pd.DataFrame) -> pd.DataFrame:
     return frame[frame["model"].isin(FEATURED)]
 
 
-def nice_ticks(plot: Axes) -> None:
-    """Plain labels on log and logit axes: 1, 2, 5, 10 ... and 99, 99.9 (%).
+def log_ticks(axis: Axis) -> None:
+    """Label a log axis 1, 2, 5, 10, ... rather than 10^0, at most five ticks.
 
-    A log axis takes the densest of the 1-2-3-5, 1-2-5 and 1 ticks per decade
-    that keeps to five within its limits.
+    Of the 1-2-3-5, 1-2-5 and 1 ticks per decade, it takes the densest that
+    keeps to five within the axis' limits.
     """
-    for axis, (low, high) in (
-        (plot.xaxis, plot.get_xlim()),
-        (plot.yaxis, plot.get_ylim()),
-    ):
-        if axis.get_scale() == "logit":
-            ticks = [tick for tick in LOGIT_TICKS if low <= tick <= high]
-            axis.set_major_formatter(FuncFormatter(lambda value, _: f"{100 * value:g}"))
-        elif axis.get_scale() == "log":
-            decades = range(int(np.log10(low)) - 1, int(np.log10(high)) + 2)
-            for subs in ((1, 2, 3, 5), (1, 2, 5), (1,)):
-                ticks = [
-                    m * 10.0**k
-                    for k in decades
-                    for m in subs
-                    if low <= m * 10.0**k <= high
-                ]
-                if len(ticks) <= 5:
-                    break
-            axis.set_major_formatter(StrMethodFormatter("{x:g}"))
-        else:
-            continue
-        axis.set_major_locator(FixedLocator(ticks))
-        axis.set_minor_formatter(NullFormatter())
-
-
-def limits(means: pd.DataFrame, metric: str, scale: str) -> tuple[float, float]:
-    """A y range on which the models separate, found in the axis' own scale."""
-    forward, inverse = {
-        "log": (np.log10, lambda v: 10**v),
-        "logit": (lambda p: np.log(p / (1 - p)), lambda v: 1 / (1 + np.exp(-v))),
-    }.get(scale, (lambda value: value,) * 2)
-    found = report.y_range(
-        means.assign(mean=forward(means[metric])).reset_index(), "iteration", True
-    )
-    return tuple(inverse(np.array(found)))
+    low, high = axis.get_view_interval()
+    decades = range(int(np.log10(low)) - 1, int(np.log10(high)) + 2)
+    for subs in ((1, 2, 3, 5), (1, 2, 5), (1,)):
+        ticks = [
+            m * 10.0**k for k in decades for m in subs if low <= m * 10.0**k <= high
+        ]
+        if len(ticks) <= 5:
+            break
+    axis.set_major_locator(FixedLocator(ticks))
+    axis.set_major_formatter(StrMethodFormatter("{x:g}"))
+    axis.set_minor_formatter(NullFormatter())
 
 
 def legend() -> plt.Figure:
@@ -152,8 +120,11 @@ def legend() -> plt.Figure:
 
 
 def convergence(curves: pd.DataFrame, task: str) -> plt.Figure:
-    """The task's metric against training time, for the featured models."""
-    metric, label, scale, _ = TASKS[task]
+    """The task's metric against training time, for the featured models.
+
+    Time is logarithmic, since the curves span more than a decade of it.
+    """
+    metric, label, _ = TASKS[task]
     curves = featured(curves)
     curves = curves.assign(
         time=curves.groupby(["model", "iteration"])["time"].transform("mean"),
@@ -173,25 +144,32 @@ def convergence(curves: pd.DataFrame, task: str) -> plt.Figure:
         legend=False,
         ax=plot,
     )
+    # A range on which the models separate (see report.y_range), from the
+    # first evaluation inside it to the last.
     means = curves.groupby(["model", "iteration"])[[metric, "time"]].mean()
-    low, high = limits(means, metric, scale)
+    low, high = report.y_range(
+        means.assign(mean=means[metric]).reset_index(), "iteration", True
+    )
+    low = max(low, FLOOR.get(task, low))
     shown = means[means[metric].between(low, high)]["time"]
-    # Scaled after plotting, since seaborn would average in the axis' scale.
     plot.set(
         xscale="log",
-        yscale=scale,
         xlim=(shown.min() / 1.1, means["time"].max() * 1.1),
         ylim=(low, high),
         xlabel="Training time (s)",
         ylabel=label,
     )
-    nice_ticks(plot)
+    log_ticks(plot.xaxis)
     return figure
 
 
 def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
-    """Each model's final quality against its training time or inference rate."""
-    metric, label, scale, _ = TASKS[task]
+    """Each model's final quality against its training time or inference rate.
+
+    Both axes are linear: the models lie within a decade of each other, where
+    a log axis would only cost the reader the plain reading of the distances.
+    """
+    metric, label, _ = TASKS[task]
     axis = {
         "time": "Training time (s)",
         "speed": f"Inference ({report.SPEED[task]})",
@@ -200,19 +178,12 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
     rest = final[~final["model"].isin(FEATURED)]
     others = rest.groupby("model")[[cost, metric]].mean()
     figure, plot = plt.subplots(figsize=SIZE)
-    plot.set(
-        xscale="log",
-        yscale=scale,
-        xlim=(final[cost].min() / 1.15, final[cost].max() * 1.15),
-        xlabel=axis,
-        ylabel=label,
-    )
     plot.scatter(others[cost], others[metric], s=14, color=OTHERS, zorder=2)
     for model, (color, _, filled) in FEATURED.items():
         x, y = means.loc[model, [cost, metric]]
         face = color if filled else "white"
         plot.scatter(x, y, s=30, facecolor=face, edgecolor=color, zorder=3)
-    nice_ticks(plot)
+    plot.set(xlabel=axis, ylabel=label)
     return figure
 
 
@@ -347,14 +318,14 @@ def paired_error(final: pd.DataFrame, metrics: Sequence[str]) -> pd.DataFrame:
     )
 
 
-def tables(final: pd.DataFrame, curves: pd.DataFrame, task: str) -> dict[str, str]:
+def tables(final: pd.DataFrame, task: str) -> dict[str, str]:
     """The task's table, with its metrics per signal where the signals are few.
 
     The averaged columns carry one paired standard error over the signals.
     NeRF's table has a super column per scene over its three metrics, so it
     needs the width of a page turned sideways.
     """
-    metrics = TASKS[task][3]
+    metrics = TASKS[task][2]
     spec = cost()
     values = final.groupby("model")[list(spec)].mean()
     errors = paired_error(final, metrics)
@@ -378,7 +349,7 @@ def main() -> None:
         report.save(convergence(curves, task), out_dir / task / "convergence")
         report.save(tradeoff(final, task), out_dir / task / "tradeoff")
         report.save(tradeoff(final, task, "speed"), out_dir / task / "throughput")
-        for suffix, text in tables(final, curves, task).items():
+        for suffix, text in tables(final, task).items():
             (out_dir / task / f"table.{suffix}").write_text(text)
         print(f"{task}: written to {out_dir / task}")
     # For the text: who reaches a high IoU, and how soon.

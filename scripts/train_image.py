@@ -10,9 +10,9 @@ from typing import Any
 
 import torch
 from PIL import Image
+from train_common import ROOT, build, record, resolve, run
 
 import neurofield as nf
-from train_common import ROOT, build, record, resolve, run
 
 DATA = sorted((ROOT / "data" / "Kodak").glob("kodim*.png"))
 

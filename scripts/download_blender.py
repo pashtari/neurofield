@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Download the NeRF synthetic (Blender) scenes.
 
 The 8 scenes from NeRF (ECCV 2020), each with 100 train / 100 val / 200 test

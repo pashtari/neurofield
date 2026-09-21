@@ -12,9 +12,9 @@ from typing import Any
 
 import torch
 from PIL import Image
+from train_common import ROOT, build, record, run
 
 import neurofield as nf
-from train_common import ROOT, build, record, run
 
 DATA = sorted(
     p.parent for p in (ROOT / "data/nerf/blender").glob("*/transforms_train.json")

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Download the Kodak Lossless True Color Image Suite.
 
 The 24 images (768x512, kodim01.png ... kodim24.png) used by SIREN, FINER,

@@ -1,6 +1,7 @@
 # FUTON ablation on the occupancy task: a tensor-ring combiner (-TR) against
-# the default CP one, for three bases at K = 128. Tensor-ring rank 15 comes
-# closest in size: 137,476 parameters against CP rank 218's 131,673.
+# the default CP one, for the lanczos and sinc bases at K = 128. Tensor-ring
+# rank 15 comes closest in size: 137,476 parameters against CP rank 218's
+# 131,673.
 #     python scripts/train_occupancy.py --config configs/ablation-futon/tensor_net.yaml
 # The data and training settings repeat configs/occupancy.yaml.
 
@@ -16,15 +17,6 @@ train:
   seed: 0
 
 models:
-  FUTON-cosine:
-    class: FUTON
-    kwargs:
-      basis: [cosine, {num_components: 128, grid_size: 256}]
-      combiner: [cp, {rank: 218}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
   FUTON-lanczos:
     class: FUTON
     kwargs:
@@ -39,15 +31,6 @@ models:
     kwargs:
       basis: [sinc, {num_components: 128, grid_size: 256}]
       combiner: [cp, {rank: 218}]
-      decoder: [mlp, {hidden_layers: 1}]
-      output_activation: tanh
-    train: {lr: 1.0e-2}
-
-  FUTON-cosine-TR:
-    class: FUTON
-    kwargs:
-      basis: [cosine, {num_components: 128, grid_size: 256}]
-      combiner: [tr, {rank: 15}]
       decoder: [mlp, {hidden_layers: 1}]
       output_activation: tanh
     train: {lr: 1.0e-2}

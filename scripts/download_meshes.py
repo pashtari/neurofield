@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Download meshes from the Stanford 3D Scanning Repository.
 
 The 5 meshes used by FINER (CVPR 2024) and BACON (CVPR 2022), fetched from the

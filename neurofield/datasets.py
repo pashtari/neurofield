@@ -479,14 +479,25 @@ class OccupancyCoordinateDataset(ImageCoordinateDataset):
         return torch.from_numpy(voxels.matrix.astype(np.float32))
 
     def save(
-        self, x: Tensor, path: str | os.PathLike[str], smooth: bool = True
+        self,
+        x: Tensor,
+        path: str | os.PathLike[str],
+        smooth: bool = True,
+        size: int = 1024,
+        up: int = 1,
+        mesh: bool = True,
     ) -> None:
         """Export occupancy as a ``.dae`` mesh and ``.png`` render (requires ``3d``).
 
         ``x`` has shape ``(1, D, H, W)`` or ``(D, H, W)``; output suffixes replace
         that of ``path``. ``smooth=True`` applies Gaussian smoothing (sigma 1)
-        before marching cubes at iso-level zero. Rendering needs a display, so
-        without one only the mesh is written and a warning is issued.
+        before marching cubes at iso-level zero. The ``size`` by ``size`` render
+        draws axis ``up`` upwards and looks down the shortest of the other two,
+        which shows the widest silhouette, from a camera fitted to the grid
+        rather than to the mesh, so that the reconstructions of one shape are
+        framed alike and can be compared. It needs no display, and where the
+        renderer cannot start only the mesh is written. ``mesh=False`` keeps
+        the render alone, without the ``.dae``.
         """
         import mcubes
         import open3d as o3d
@@ -499,25 +510,31 @@ class OccupancyCoordinateDataset(ImageCoordinateDataset):
             volume = mcubes.smooth(volume.copy(), method="gaussian", sigma=1)
 
         vertices, triangles = mcubes.marching_cubes(volume, 0)
-        mcubes.export_mesh(vertices, triangles, dae_path)
+        if mesh:
+            mcubes.export_mesh(vertices, triangles, dae_path)
 
-        if not os.environ.get("DISPLAY"):
-            # Open3D renders through GLFW, which aborts the process when it
-            # cannot open a window, so check before creating one.
-            warnings.warn(f"No display; saved {dae_path.name} without a render.")
+        geometry = o3d.geometry.TriangleMesh(
+            o3d.utility.Vector3dVector(vertices), o3d.utility.Vector3iVector(triangles)
+        )
+        geometry.compute_vertex_normals()
+        material = o3d.visualization.rendering.MaterialRecord()
+        material.shader = "defaultLit"
+        try:
+            renderer = o3d.visualization.rendering.OffscreenRenderer(size, size)
+        except RuntimeError as error:  # a machine without EGL or a GPU
+            warnings.warn(f"No renderer ({error}); no {png_path.name}.")
             return
-
-        mesh = o3d.geometry.TriangleMesh()
-        mesh.vertices = o3d.utility.Vector3dVector(vertices)
-        mesh.triangles = o3d.utility.Vector3iVector(triangles)
-        mesh.compute_vertex_normals()
-
-        visualizer = o3d.visualization.Visualizer()
-        visualizer.create_window(visible=False)
-        visualizer.add_geometry(mesh)
-        visualizer.update_renderer()
-        visualizer.capture_screen_image(str(png_path), do_render=True)
-        visualizer.destroy_window()
+        renderer.scene.add_geometry("mesh", geometry, material)
+        renderer.scene.set_background([1.0, 1.0, 1.0, 1.0])
+        renderer.scene.show_skybox(False)
+        # Tone mapping would grey the white background and flatten the shading.
+        renderer.scene.view.set_post_processing(False)
+        extent = np.array(volume.shape, dtype=float)
+        center = (extent - 1) / 2
+        sideways = min({0, 1, 2} - {up}, key=lambda axis: extent[axis])
+        eye = center + np.eye(3)[sideways] * 1.1 * np.linalg.norm(extent)
+        renderer.setup_camera(45.0, center, eye, np.eye(3)[up])
+        o3d.io.write_image(str(png_path), renderer.render_to_image())
 
     @staticmethod
     def preprocess(x: Tensor) -> Tensor:

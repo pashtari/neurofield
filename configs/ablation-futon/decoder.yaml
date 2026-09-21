@@ -1,0 +1,74 @@
+# FUTON ablation on the occupancy task: the decoder. The paper's Eq. (9) ends
+# in a linear decoder; the benchmark's one-layer MLP is an extension that
+# spends 47,961 of its 131,673 parameters there, 36% of the model. A linear
+# decoder frees them for the combiner, so CP rank 342 brings it back to
+# 131,671 parameters; rank 218, the MLP model's, is kept as well to separate
+# what the extra parameters buy from what the nonlinearity buys (83,931).
+#     python scripts/train_occupancy.py --config configs/ablation-futon/decoder.yaml
+# The data and training settings repeat configs/occupancy.yaml.
+
+data:
+  resolution: 256
+  subsample: 0.01
+
+train:
+  num_epochs: 2000
+  log_interval: 100
+  eval_interval: 100
+  chunk_size: 262144
+  seed: 0
+
+models:
+  FUTON-lanczos:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 218}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 128, grid_size: 256}]
+      combiner: [cp, {rank: 218}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-linear:  # equal size
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc-linear:  # equal size
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 128, grid_size: 256}]
+      combiner: [cp, {rank: 342}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-lanczos-linear-R218:  # equal rank
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 218}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}
+
+  FUTON-sinc-linear-R218:  # equal rank
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: 128, grid_size: 256}]
+      combiner: [cp, {rank: 218}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 1.0e-2}

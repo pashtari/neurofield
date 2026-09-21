@@ -1,0 +1,46 @@
+# FUTON ablation on the NeRF task: components against rank, at the benchmark's
+# size. The image study found that a finer basis with a lower rank loses little
+# behind an MLP decoder (36.07 against 37.04 dB at the full component count),
+# and this asks the same of a radiance field: K = 256 with CP rank 78 holds
+# 73,733 parameters against the benchmark's K = 128, R = 128 at 74,131, so the
+# finer basis is given no extra budget.
+#     python scripts/train_nerf.py --config configs/ablation-futon/components_nerf.yaml \
+#         --data data/nerf/blender/lego
+# The data, field and training settings repeat configs/nerf.yaml.
+
+data:
+  downsample: 4
+  train_skip: 4
+  val_skip: 25
+
+field:
+  geometry_features: 15
+  direction_encoding: sh
+  color_net: [mlp, {hidden_features: 64, hidden_layers: 2}]
+
+train:
+  num_steps: 37500
+  num_rays: 4096
+  max_samples_per_ray: 1024
+  log_interval: 100
+  eval_interval: 2500
+  seed: 0
+
+render_views: [0, 55]
+
+models:
+  FUTON-lanczos:  # the benchmark's entry
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 128, radius: 3}]
+      combiner: [cp, {rank: 128}]
+      decoder: [mlp, {hidden_layers: 1}]
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos-K256:  # twice the components, the rank that pays for them
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: 256, radius: 3}]
+      combiner: [cp, {rank: 78}]
+      decoder: [mlp, {hidden_layers: 1}]
+    train: {lr: 3.0e-2}

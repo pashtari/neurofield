@@ -1,0 +1,127 @@
+# FUTON ablation on the image task: the decoder, and how a linear one wants
+# its budget spent. The benchmark's one-layer MLP holds 51,075 of its 194,435
+# parameters, which a linear decoder returns to the combiner. Rather than give
+# them all to the rank, this walks the iso-parameter curve: as the components
+# per axis rise from a quarter of the image to the whole of it, the rank falls
+# to keep every entry at about 194.4k parameters. An MLP at the full component
+# count is kept as a control, to tell "more components" from "linear decoder".
+#     python scripts/train_image.py --config configs/ablation-futon/decoder_image.yaml
+# The data and training settings repeat configs/image.yaml.
+
+data:
+  subsample: 0.1
+
+train:
+  num_epochs: 2000
+  log_interval: 100
+  eval_interval: 100
+  seed: 0
+
+models:
+  FUTON-sinc:  # the benchmark's entry
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
+      combiner: [cp, {rank: 224}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-sinc-linear-quarter:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: [H // 4, W // 4], grid_size: [H, W]}]
+      combiner: [cp, {rank: 602}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-sinc-linear-half:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
+      combiner: [cp, {rank: 302}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-sinc-linear-three-quarters:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: [3 * H // 4, 3 * W // 4], grid_size: [H, W]}]
+      combiner: [cp, {rank: 202}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-sinc-linear-full:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: [H, W], grid_size: [H, W]}]
+      combiner: [cp, {rank: 152}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-sinc-full:  # the control: full components, but the MLP back
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: [H, W], grid_size: [H, W]}]
+      combiner: [cp, {rank: 137}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos:  # the benchmark's entry
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: [H // 2, W // 2], radius: 3}]
+      combiner: [cp, {rank: 224}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos-linear-quarter:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: [H // 4, W // 4], radius: 3}]
+      combiner: [cp, {rank: 602}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos-linear-half:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: [H // 2, W // 2], radius: 3}]
+      combiner: [cp, {rank: 302}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos-linear-three-quarters:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: [3 * H // 4, 3 * W // 4], radius: 3}]
+      combiner: [cp, {rank: 202}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos-linear-full:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: [H, W], radius: 3}]
+      combiner: [cp, {rank: 152}]
+      decoder: linear
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos-full:  # the control: full components, but the MLP back
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: [H, W], radius: 3}]
+      combiner: [cp, {rank: 137}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 3.0e-2}

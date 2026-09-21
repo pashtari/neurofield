@@ -29,6 +29,12 @@ Writes results/, which holds the paper's figures and tables and nothing else:
 Tables mark the best value in bold and the second underlined. Drawing the panels
 needs the signals in data/ and a GPU; --no-panels leaves them out, and
 --overwrite draws them again, which a changed NeRF view calls for.
+
+The magnified regions are found, and a run prints the centre of every one it
+drew, ready to paste into CENTERS. Setting a signal's centres there fixes them
+by hand, in fractions of the trimmed reference, and SIDES sets how large they
+are. Panels already drawn are reused, so moving a box and running again costs
+seconds and no GPU.
 """
 
 import argparse
@@ -49,9 +55,12 @@ import yaml
 from matplotlib.axis import Axis
 from matplotlib.backends.backend_pgf import LatexError
 from matplotlib.lines import Line2D
+from matplotlib.font_manager import FontProperties
+from matplotlib.textpath import TextPath
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import (
     FixedLocator,
+    MaxNLocator,
     NullFormatter,
     NullLocator,
     StrMethodFormatter,
@@ -82,7 +91,7 @@ TASKS = {
     "nerf": ("psnr", "PSNR (dB)", ("psnr", "ssim", "lpips")),
 }
 EXAMPLES = {  # the two signals each task shows, the ones FUTON gains most on
-    "image": ("kodim19", "kodim09", "kodim01", "kodim21"),
+    "image": ("kodim01", "kodim17", "kodim19", "kodim21"),
     "occupancy": ("thai_statue", "armadillo"),
     "nerf": ("lego", "hotdog", "materials"),
 }
@@ -94,11 +103,21 @@ VIEWS = {"lego": 184, "hotdog": 136, "materials": 86}
 # search would pass over: one rectangle per box, as fractions of the trimmed
 # reference (left, top, right, bottom). The best square inside each is still
 # the one found.
-ZONES = {
-    "kodim19": ((0.02, 0.56, 0.32, 0.80), (0.00, 0.42, 0.32, 0.62)),
-    "kodim09": ((0.50, 0.42, 0.95, 0.68), (0.20, 0.20, 0.52, 0.62)),
-    "armadillo": ((0.58, 0.04, 0.98, 0.42), (0.18, 0.60, 0.82, 0.99)),
-    "hotdog": ((0.38, 0.00, 0.80, 0.38), (0.52, 0.18, 0.88, 0.58)),
+ZONES = {}
+# Centres set by hand, one per magnified region, as fractions of the trimmed
+# reference. A signal named here takes these instead of searching, so this is
+# where to put a region the search will not find. Running the report prints the
+# centres it used for every signal, in this format, to start from.
+CENTERS: dict[str, tuple[tuple[float, float], ...]] = {
+    "kodim01": ((0.904, 0.106), (0.592, 0.323)),
+    "kodim17": ((0.67, 0.22), (0.16, 0.63)),
+    "kodim19": ((0.67, 0.22), (0.25, 0.67)),
+    "kodim21": ((0.15, 0.54), (0.5, 0.6)),
+    "thai_statue": ((0.35, 0.8), (0.77, 0.92)),
+    "armadillo": ((0.5, 0.5), (0.3, 0.8)),
+    "lego": ((0.356, 0.260), (0.383, 0.678)),
+    "hotdog": ((0.475, 0.210), (0.796, 0.333)),
+    "materials": ((0.407, 0.639), (0.667, 0.741)),
 }
 UP = {"lucy": 2}  # the Stanford Lucy is z up; the other four shapes are y up
 
@@ -143,6 +162,19 @@ COLORS = ("#e02020", "#00a2c7")
 # are found, not set: see :func:`regions`. A NeRF view is 200 pixels across, so
 # its regions hold fewer of them and stay wider.
 SIDES = {"image": 0.075, "occupancy": 0.14, "nerf": 0.20}
+# The magnifications' titles and scores: the largest size they are set at, and
+# the inches kept above the panels for the titles and below for the scores. A
+# talk raises both before drawing; the paper keeps them.
+LABEL_SIZE = 6.5
+LABEL_ROOM = (0.17, 0.19)
+
+
+def text_width(text: str, weight: str = "normal") -> float:
+    """The width of ``text`` at a font size of 1pt, in points, in the style's font."""
+    path = TextPath((0, 0), text, size=1, prop=FontProperties(weight=weight))
+    return path.get_extents().width
+
+
 UNITS = {"psnr": "{:.2f} dB", "iou": "{:.2f}%"}
 
 # The FUTON ablations, all on the occupancy task: the bases from the smoothest
@@ -394,6 +426,13 @@ def log_ticks(axis: Axis) -> None:
     axis.set_minor_formatter(NullFormatter())
 
 
+def padded(values: pd.Series, fraction: float = 0.08) -> tuple[float, float]:
+    """Limits that leave a margin, so that no marker is clipped by a spine."""
+    low, high = values.min(), values.max()
+    margin = fraction * (high - low) or abs(low) * fraction or 1.0
+    return low - margin, high + margin
+
+
 def legend() -> plt.Figure:
     """The featured models' lines and markers, and the other models' gray dot."""
     handles = [
@@ -439,6 +478,12 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
     low, high = y_range(means, metric)
     low = max(low, FLOOR.get(task, low))
     shown = means[means[metric].between(low, high)]["time"]
+    # The marker the legend carries, at the end of each curve.
+    for model, (color, _, filled) in FEATURED.items():
+        last = means[means["model"] == model].iloc[-1]
+        plot.plot(last["time"], last[metric], marker="o", markersize=4,
+                  color=color, markerfacecolor=color if filled else "white",
+                  clip_on=False, zorder=4)  # fmt: skip
     plot.set(
         xscale="log",
         xlim=(shown.min() / 1.1, means["time"].max() * 1.1),
@@ -457,7 +502,12 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
     a log axis would only cost the reader the plain reading of the distances.
     """
     metric, label, _ = TASKS[task]
-    axis = {"time": "Training time (s)", "speed": f"Inference ({SPEED[task]})"}[cost]
+    # The cost axis carries its direction, as the table headers do: a reader
+    # pauses over whether more inference rate is better, never over PSNR.
+    axis = {
+        "time": r"Training time (s)$\,\downarrow$",
+        "speed": rf"Inference ({SPEED[task]})$\,\uparrow$",
+    }[cost]
     means = final.groupby("model")[[cost, metric]].mean()
     others = means[~means.index.isin(FEATURED)]
     figure, plot = plt.subplots(figsize=SIZE)
@@ -472,7 +522,16 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
             edgecolor=color,
             zorder=3,
         )
-    plot.set(xlabel=axis, ylabel=label)
+    # Explicit limits, so that the pair of figures shares a quality axis and
+    # no marker touches a spine.
+    plot.set(
+        xlim=padded(means[cost]),
+        ylim=padded(means[metric]),
+        xlabel=axis,
+        ylabel=label,
+    )
+    plot.xaxis.set_major_locator(MaxNLocator(5))
+    plot.yaxis.set_major_locator(MaxNLocator(5))
     return figure
 
 
@@ -482,6 +541,7 @@ def table(
     errors: pd.DataFrame | None = None,
     order: Sequence[str] = ROWS,
     index: str = "Model",
+    highlight: bool = False,
 ) -> dict[str, str]:
     """LaTeX and Markdown of models by columns, best bold and second underlined.
 
@@ -490,7 +550,9 @@ def table(
     decimals; values tied at those decimals share a rank. A column of
     ``errors`` follows its value as ``mean+-error``. Consecutive columns of one
     group share a spanning header. Rows follow ``order``, which the ablations
-    give their own, and ``index`` heads them.
+    give their own, and ``index`` heads them. ``highlight`` tints the two best
+    cells of every ranked column, which reads from the back of a room but would
+    be noise in a printed table.
     """
     models = [model for model in order if model in values.index]
     cells = {}
@@ -500,17 +562,21 @@ def table(
         ranks = shown.rank(ascending=not larger_is_better, method="min")
         for model in models:
             text = "–" if pd.isna(shown[model]) else f"{shown[model]:.{decimals}f}"
-            if error is not None and not pd.isna(shown[model]):
-                text += f"±{error[model]:.{decimals}f}"
+            spread = (
+                f"{error[model]:.{decimals}f}"
+                if error is not None and not pd.isna(shown[model])
+                else ""
+            )
             rank = ranks[model] if larger_is_better is not None else np.nan
-            cells[model, name] = text, rank
+            cells[model, name] = text, spread, rank
 
-    def line(model: str, bold: str, underline: str) -> list[str]:
+    def line(model: str, mark: dict[int, str], spread: str) -> list[str]:
+        # The mean carries the emphasis; the error follows it, set smaller, so
+        # that a column of values reads down the page before it reads across.
         return [model] + [
-            bold.format(text) if rank == 1 else underline.format(text) if rank == 2
-            else text
-            for text, rank in (cells[model, name] for name in spec)
-        ]  # fmt: skip
+            mark.get(rank, "{}").format(text) + (spread.format(error) if error else "")
+            for text, error, rank in (cells[model, name] for name in spec)
+        ]
 
     titles = [index] + [
         title if larger_is_better is None
@@ -518,7 +584,9 @@ def table(
         for _, title, larger_is_better, _ in spec.values()
     ]  # fmt: skip
     groups = [""] + [group for group, *_ in spec.values()]
-    latex = [rf"\begin{{tabular}}{{l{'c' * (len(titles) - 1)}}}", r"\toprule"]
+    # Numbers right against a fixed number of decimals, which lines their
+    # points up; the headers stay centred over them.
+    latex = [rf"\begin{{tabular}}{{l{'r' * (len(titles) - 1)}}}", r"\toprule"]
     flat = [f"{group} {title}".strip() for group, title in zip(groups, titles)]
     if any(groups):  # a spanning header over each group's columns
         spans, rules, first = [], [], 1
@@ -529,22 +597,29 @@ def table(
                 rules.append(rf"\cmidrule(lr){{{first}-{first + width - 1}}}")
             first += width
         latex += [" & ".join(spans) + r" \\", "".join(rules)]
-    latex += [" & ".join(titles) + r" \\", r"\midrule"]
+    centered = [titles[0]] + [rf"\multicolumn{{1}}{{c}}{{{t}}}" for t in titles[1:]]
+    latex += [" & ".join(centered) + r" \\", r"\midrule"]
     markdown = ["| " + " | ".join(flat) + " |", "| --- " * len(flat) + "|"]
+    tex_mark = (
+        {1: r"\cellcolor{{best}}\textbf{{{}}}", 2: r"\cellcolor{{second}}{}"}
+        if highlight
+        else {1: r"\textbf{{{}}}", 2: r"\underline{{{}}}"}
+    )
     for model in models:
         if model == "FUTON-sinc":
             latex.append(r"\midrule")
         latex.append(
-            " & ".join(line(model, r"\textbf{{{}}}", r"\underline{{{}}}")) + r" \\"
+            " & ".join(line(model, tex_mark, r"{{\scriptsize$\pm${}}}")) + r" \\"
         )
-        markdown.append("| " + " | ".join(line(model, "**{}**", "_{}_")) + " |")
+        markdown.append(
+            "| " + " | ".join(line(model, {1: "**{}**", 2: "_{}_"}, "±{}")) + " |"
+        )
     latex += [r"\bottomrule", r"\end{tabular}"]
     tex = "\n".join(latex) + "\n"
     # None of the commands above holds one of these, so escaping is safe.
     for symbol, command in (
         ("↑", r"$\uparrow$"),
         ("↓", r"$\downarrow$"),
-        ("±", r"$\pm$"),
         ("%", r"\%"),
         ("#", r"\#"),
         ("_", r"\_"),
@@ -806,18 +881,20 @@ def detail(gray: np.ndarray, window: int = 5) -> np.ndarray:
 
 
 def regions(
-    truth: np.ndarray,
-    baseline: np.ndarray,
-    ours: np.ndarray,
+    panel: dict[str, np.ndarray],
+    ours: str,
     side: int,
     zones: tuple | None = None,
 ) -> list[tuple[int, int]]:
-    """The two squares of fine detail where ``ours`` gains most over ``baseline``.
+    """The squares where the models differ most and ``ours`` is closest.
 
-    A magnification is worth its space only where the models differ, so the
-    regions are found rather than set: the gain is the baseline's squared error
-    less FUTON's, weighted by the detail the reference carries there and summed
-    over every square of the given side.
+    A magnification earns its space only where the models disagree, so the
+    regions are found rather than set: the spread of the panels about their
+    mean, weighted by the detail the reference carries there and summed over
+    every square of the given side. Spread favours no model, which asking
+    where FUTON beats one chosen baseline would; the squares are then kept to
+    those where FUTON is in fact the closest of the panels shown, so that the
+    figure magnifies what it claims.
 
     A render sits on a blank field, where a silhouette a voxel out of place
     costs more error than any surface detail, so there the squares are kept
@@ -827,8 +904,17 @@ def regions(
     ``zones``, each square is instead the best one inside its own rectangle,
     which says where to look without saying what to take.
     """
-    gain = ((baseline - truth) ** 2 - (ours - truth) ** 2).sum(-1)
-    scores = box_sums(gain * detail(truth.mean(-1)), side)
+    truth = panel["truth"]
+    shown = [name for name in panel if name != "truth"]
+    spread = np.var([panel[name].mean(-1) for name in shown], axis=0)
+    scores = box_sums(spread * detail(truth.mean(-1)), side)
+
+    error = {
+        name: box_sums(((panel[name] - truth) ** 2).sum(-1), side) for name in shown
+    }
+    leads = error[ours] <= np.min([error[n] for n in shown if n != ours], axis=0)
+    if leads.any():
+        scores = np.where(leads, scores, -np.inf)
     blank = np.abs(truth - truth[0, 0]).sum(-1) <= 0.05
     if blank.mean() > 0.15:  # a render on a blank field, not a photograph
         inside = box_sums((~blank).astype(float), side) >= 0.75 * side**2
@@ -879,31 +965,44 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
     panel = {name: image[box] for name, image in panel.items()}
     height, width = panel["truth"].shape[:2]
 
-    # The strongest baseline is the one worth magnifying against.
-    baselines = [model for model in FEATURED if not model.startswith("FUTON")]
-    best = (
-        scores[baselines].idxmax() if METRICS[metric][1] else scores[baselines].idxmin()
-    )
     ours = scores[["FUTON-sinc", "FUTON-lanczos"]].idxmax()
     side = round(SIDES[task] * np.sqrt(width * height))
-    found = regions(panel["truth"], panel[best], panel[ours], side, ZONES.get(signal))
+    if signal in CENTERS:  # set by hand, in fractions of the trimmed reference
+        found = [
+            (
+                min(max(round(x * width - side / 2), 0), width - side),
+                min(max(round(y * height - side / 2), 0), height - side),
+            )
+            for x, y in CENTERS[signal]
+        ]
+    else:
+        found = regions(panel, ours, side, ZONES.get(signal))
+    centres = ", ".join(
+        f"({(left + side / 2) / width:.3f}, {(top + side / 2) / height:.3f})"
+        for left, top in found
+    )
+    print(f'    "{signal}": ({centres}),  # centres, for CENTERS', flush=True)
 
     rows, columns = len(found), len(FEATURED) + 1
-    # The reference spans the rows and the gap between them, so its box is that
-    # much taller than one magnification and it fills the width its aspect
-    # ratio asks for, with no white slivers beside it. A gutter then sets it
-    # apart from the magnifications it indexes.
-    gap, gutter = 0.06, 0.3
+    # Laid out in inches rather than by a gridspec, so that the reference
+    # spans the rows exactly, its top and bottom edges on theirs, whatever its
+    # aspect ratio. A magnification is square; the reference is as wide as its
+    # aspect ratio makes it at that height, and a gutter sets it apart from
+    # the magnifications it indexes.
+    gap, gutter = 0.06, 0.3  # both in units of one magnification's side
     span = rows + (rows - 1) * gap
-    # A reference wider than this would leave the magnifications too narrow to
-    # title, so it keeps to it and centres itself in the space.
-    ratios = [min(width / height * span, 2.5), gutter, *[1] * columns]
-    figure = plt.figure(figsize=(WIDTH, span * WIDTH / sum(ratios) + 0.24))
-    grid = figure.add_gridspec(
-        rows, columns + 2, width_ratios=ratios, wspace=gap, hspace=gap
-    )
+    aspect = width / height
+    unit = WIDTH / (aspect * span + gutter + columns + (columns - 1) * gap)
+    above, below = LABEL_ROOM  # inches kept for the titles and the scores
+    tall = span * unit + above + below
+    figure = plt.figure(figsize=(WIDTH, tall))
+    figure.set_layout_engine("none")
 
-    plot = figure.add_subplot(grid[:, 0])
+    def place(left: float, bottom: float, wide: float, high: float):
+        """An axes at a position given in inches from the lower left."""
+        return figure.add_axes([left / WIDTH, bottom / tall, wide / WIDTH, high / tall])
+
+    plot = place(0, below, aspect * span * unit, span * unit)
     plot.imshow(panel["truth"])
     plot.set_axis_off()
     for (left, top), color in zip(found, COLORS):
@@ -911,15 +1010,30 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
             Rectangle((left, top), side, side, fill=False, color=color, linewidth=0.9)
         )
 
+    winner = scores[list(FEATURED)].idxmax()  # both plotted metrics are larger-better
     shown = [("Ground truth", "truth", "")] + [
         (model, model, UNITS[metric].format(scores[model])) for model in FEATURED
     ]
-    # Titles as large as the columns take, so the longest name always fits.
-    longest = max(len(title) for title, _, _ in shown)
-    size = min(6.5, 130 * WIDTH / sum(ratios) / longest)
-    for column, (title, name, score) in enumerate(shown, start=2):
+    # Titles and scores each as large as their columns allow: the widest pair
+    # of neighbours keeps 8% of the column spacing between them, measured in
+    # the figure's own font, and both are capped at LABEL_SIZE.
+    spacing = (1 + gap) * unit * 72  # points between column centres
+
+    def fitting(labels: list[str], weight: str = "normal") -> float:
+        widths = [text_width(label, weight) for label in labels]
+        pairs = [(a + b) / 2 for a, b in zip(widths, widths[1:])]
+        return min(LABEL_SIZE, 0.92 * spacing / max(pairs))
+
+    title_size = fitting([title for title, _, _ in shown])
+    score_size = fitting([score for _, _, score in shown if score], "bold")
+    for column, (title, name, score) in enumerate(shown):
         for row, (left, top) in enumerate(found):
-            plot = figure.add_subplot(grid[row, column])
+            plot = place(
+                (aspect * span + gutter + column * (1 + gap)) * unit,
+                below + (rows - 1 - row) * (1 + gap) * unit,
+                unit,
+                unit,
+            )
             # Nearest keeps a NeRF render's few pixels crisp rather than blurred.
             plot.imshow(
                 panel[name][top : top + side, left : left + side],
@@ -931,12 +1045,17 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
             if row == 0:
                 plot.set_title(
                     title,
-                    fontsize=size,
+                    fontsize=title_size,
                     pad=3,
                     color=PALETTE[0] if title.startswith("FUTON") else "black",
                 )
-            if row == rows - 1:
-                plot.set_xlabel(score, fontsize=size, labelpad=3)
+            if row == rows - 1:  # the best score is set bold, as in the tables
+                plot.set_xlabel(
+                    score,
+                    fontsize=score_size,
+                    labelpad=3,
+                    fontweight="bold" if name == winner else "normal",
+                )
     return figure
 
 
@@ -1042,9 +1161,12 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
             levels = sorted(rows[axis].unique())
             plot.set_xticks(levels, levels)
             plot.xaxis.set_minor_locator(NullLocator())
+            # A white ground under the legend, since "best" still puts it over
+            # a curve in a panel this small.
             plot.legend(
                 title=labels[hue].split()[-1],
-                frameon=False,
+                framealpha=0.85,
+                edgecolor="none",
                 ncol=2,
                 columnspacing=0.8,
                 fontsize=6,
@@ -1100,7 +1222,14 @@ def study_curves(
         Line2D([], [], color=color, dashes=dashes or (None, None), label=label)
         for label, color, dashes in styles.values()
     ]
-    plot.legend(handles=handles, frameon=False, ncol=2, columnspacing=0.8, fontsize=6)
+    plot.legend(
+        handles=handles,
+        framealpha=0.85,
+        edgecolor="none",
+        ncol=2,
+        columnspacing=0.8,
+        fontsize=6,
+    )
     save(figure, path)
 
 

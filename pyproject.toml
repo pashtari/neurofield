@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "neurofield"
 version = "0.1.0"
-description = "PyTorch implementation of neural fields (implicit neural representations)"
+description = "NeuroField: neural fields in PyTorch, with FUTON, a Fourier tensor network, and the models, data and training loops to compare it against"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["neural fields", "implicit neural representations", "INR", "pytorch", "deep learning"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
@@ -56,12 +56,17 @@ dev = [
     "pyinstrument>=5.1.2",
     "pytest>=7.0",
 ]
-# Optional fused hash-grid/MLP kernels (build from source, CUDA toolkit needed):
-# pip install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+]
 
 [project.urls]
 Homepage = "https://github.com/pashtari/neurofield"
+Documentation = "https://pashtari.github.io/neurofield/"
 Repository = "https://github.com/pashtari/neurofield"
+Paper = "https://arxiv.org/abs/2602.13414"
+Issues = "https://github.com/pashtari/neurofield/issues"
 
 [tool.setuptools.packages.find]
 include = ["neurofield*"]

@@ -1,0 +1,145 @@
+site_name: NeuroField
+site_description: NeuroField, neural fields in PyTorch, with FUTON, a Fourier tensor network for implicit neural representations.
+site_url: https://pashtari.github.io/neurofield/
+repo_url: https://github.com/pashtari/neurofield
+repo_name: pashtari/neurofield
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Pooya Ashtari. MIT License.
+
+theme:
+  name: material
+  language: en
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
+  icon:
+    repo: fontawesome/brands/github
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+  - autorefs
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            extensions:
+              - docs/_ext/griffe_rst_roles.py:RSTRoles
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_source: true
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: true
+            line_length: 80
+            merge_init_into_class: true
+            members_order: source
+            filters: ["!^_"]
+            show_if_no_docstring: false
+            heading_level: 2
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Your first neural field: getting-started/quickstart.md
+  - Concepts:
+      - concepts/index.md
+      - Neural fields in NeuroField: concepts/neural-fields.md
+      - FUTON: concepts/futon.md
+      - The model zoo: concepts/models.md
+      - Conventions: concepts/conventions.md
+  - Tutorials:
+      - tutorials/index.md
+      - Fitting an image: tutorials/image.md
+      - Occupancy volumes: tutorials/occupancy.md
+      - Radiance fields: tutorials/nerf.md
+      - Image compression: tutorials/compression.md
+      - Custom components: tutorials/custom-components.md
+      - Notebooks: tutorials/notebooks.md
+  - Experiments:
+      - experiments/index.md
+      - Benchmarks: experiments/benchmarks.md
+      - Ablations: experiments/ablations.md
+      - Reproducing the paper: experiments/reproduce.md
+  - API reference:
+      - api/index.md
+      - neurofield.models: api/models.md
+      - FUTON, bases and combiners: api/futon.md
+      - Datasets: api/datasets.md
+      - Training and evaluation: api/training.md
+      - Metrics and losses: api/metrics.md
+      - Quantization: api/quantization.md
+      - Compression: api/compression.md
+      - Radiance fields: api/nerf.md
+      - Utilities: api/utils.md
+  - Troubleshooting: troubleshooting.md

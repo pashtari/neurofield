@@ -167,6 +167,11 @@ SIDES = {"image": 0.075, "occupancy": 0.14, "nerf": 0.20}
 # talk raises both before drawing; the paper keeps them.
 LABEL_SIZE = 6.5
 LABEL_ROOM = (0.17, 0.19)
+# The widest a reference is drawn, as an aspect ratio: a wider one is scaled
+# down and centred on the rows, so that a panorama does not squeeze the
+# magnifications. None draws every reference at the full height of the rows,
+# as the paper does; the deck caps it.
+REFERENCE_ASPECT: float | None = None
 
 
 def text_width(text: str, weight: str = "normal") -> float:
@@ -992,7 +997,8 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
     gap, gutter = 0.06, 0.3  # both in units of one magnification's side
     span = rows + (rows - 1) * gap
     aspect = width / height
-    unit = WIDTH / (aspect * span + gutter + columns + (columns - 1) * gap)
+    drawn = aspect if REFERENCE_ASPECT is None else min(aspect, REFERENCE_ASPECT)
+    unit = WIDTH / (drawn * span + gutter + columns + (columns - 1) * gap)
     above, below = LABEL_ROOM  # inches kept for the titles and the scores
     tall = span * unit + above + below
     figure = plt.figure(figsize=(WIDTH, tall))
@@ -1002,7 +1008,11 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
         """An axes at a position given in inches from the lower left."""
         return figure.add_axes([left / WIDTH, bottom / tall, wide / WIDTH, high / tall])
 
-    plot = place(0, below, aspect * span * unit, span * unit)
+    reference_wide = drawn * span * unit
+    reference_tall = reference_wide / aspect
+    plot = place(
+        0, below + (span * unit - reference_tall) / 2, reference_wide, reference_tall
+    )
     plot.imshow(panel["truth"])
     plot.set_axis_off()
     for (left, top), color in zip(found, COLORS):
@@ -1029,7 +1039,7 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
     for column, (title, name, score) in enumerate(shown):
         for row, (left, top) in enumerate(found):
             plot = place(
-                (aspect * span + gutter + column * (1 + gap)) * unit,
+                (drawn * span + gutter + column * (1 + gap)) * unit,
                 below + (rows - 1 - row) * (1 + gap) * unit,
                 unit,
                 unit,

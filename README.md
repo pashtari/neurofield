@@ -41,7 +41,10 @@ Every model of a task has the same parameter budget, the hyperparameters of its 
 | Radiance fields (Blender) | 8 | 75k | **28.95 dB** in 343 s | 28.93 dB in **315 s** | FINER, 28.85 dB in 445 s |
 
 <p align="center">
-  <img src="docs/assets/convergence_image.svg" width="440" alt="PSNR against training time on Kodak">
+  <img src="docs/assets/results_image.svg" width="920" alt="Kodak: PSNR against training time for FUTON and the strongest model of each family; every model's final PSNR against its training time; and against its inference rate">
+</p>
+<p align="center">
+  <sub>Kodak: PSNR against training time for FUTON and the strongest model of each family (left), and every model's final PSNR against its training time (middle) and its inference rate in images per second (right).</sub>
 </p>
 <p align="center">
   <img src="docs/assets/qualitative_kodim19.png" width="920" alt="kodim19: two regions magnified for every featured model">

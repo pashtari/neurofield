@@ -99,8 +99,8 @@ All models are trained at the same parameter count per task, with Adam and a sha
 | Radiance fields (Blender) | 8 | 75k | **28.95 dB** in 343 s | 28.93 dB in **315 s** | FINER, 28.85 dB in 445 s |
 
 <figure markdown="span">
-  ![Kodak convergence](assets/convergence_image.svg){ width="520" }
-  <figcaption>Kodak: PSNR against training time for FUTON and the strongest model of each other family. The band is one within-image standard error.</figcaption>
+  ![Kodak: convergence, training-time trade-off and throughput](assets/results_image.svg){ width="960" }
+  <figcaption>Kodak: PSNR against training time for FUTON and the strongest model of each family (the band is one within-image standard error); every model's final PSNR against its training time; and against its inference rate.</figcaption>
 </figure>
 
 <figure markdown="span">

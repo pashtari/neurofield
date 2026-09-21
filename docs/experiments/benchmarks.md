@@ -24,9 +24,8 @@ Two notes on the rows. **TensoRF** is the variant its authors recommend for the 
 | FUTON-lanczos | 194.4 | **6.6** | *38.20* ± 0.10 | *95.24* ± 0.35 | *0.0998* ± 0.0027 |
 
 <figure markdown="span">
-  ![Kodak convergence](../assets/convergence_image.svg){ width="520" }
-  ![Kodak trade-off](../assets/tradeoff_image.svg){ width="520" }
-  <figcaption>PSNR against training time for FUTON and the strongest model of each family, the band one within-image standard error; and every model's final PSNR against its training time.</figcaption>
+  ![Kodak: convergence, training-time trade-off and throughput](../assets/results_image.svg){ width="960" }
+  <figcaption>PSNR against training time for FUTON and the strongest model of each family, the band one within-image standard error; every model's final PSNR against its training time; and against its inference rate, in images per second.</figcaption>
 </figure>
 
 <figure markdown="span">
@@ -55,8 +54,8 @@ Five Stanford shapes voxelized at $256^3$, about 132k parameters per model, 2000
 | FUTON-lanczos | 131.7 | 8.8 | **99.95** | *99.90* | **99.92** | *99.88* | *99.85* | **99.90** ± 0.03 |
 
 <figure markdown="span">
-  ![Occupancy convergence](../assets/convergence_occupancy.svg){ width="520" }
-  ![Occupancy trade-off](../assets/tradeoff_occupancy.svg){ width="520" }
+  ![Occupancy: convergence, training-time trade-off and throughput](../assets/results_occupancy.svg){ width="960" }
+  <figcaption>IoU against training time for the featured models; every model's final IoU against its training time; and against its inference rate, in volumes per second.</figcaption>
 </figure>
 
 <figure markdown="span">
@@ -103,8 +102,8 @@ Per scene, the picture is mixed, which the mean hides: FUTON leads on lego, mate
 Test-view PSNR in dB. `results/nerf/table.md` also lists SSIM and LPIPS per scene.
 
 <figure markdown="span">
-  ![NeRF convergence](../assets/convergence_nerf.svg){ width="520" }
-  ![NeRF trade-off](../assets/tradeoff_nerf.svg){ width="520" }
+  ![NeRF: convergence, training-time trade-off and throughput](../assets/results_nerf.svg){ width="960" }
+  <figcaption>Validation PSNR against training time for the featured models; every model's final test PSNR against its training time; and against its rendering rate, in views per second.</figcaption>
 </figure>
 
 <figure markdown="span">

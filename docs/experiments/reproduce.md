@@ -84,7 +84,7 @@ results/
 ├── legend.{pdf,pgf}                 the models' legend, shared by every figure
 ├── <task>/convergence.{pdf,pgf}     quality against training time, FUTON and the strongest model of each family
 ├── <task>/tradeoff.{pdf,pgf}        every model's final quality against its training time
-├── <task>/throughput.{pdf,pgf}      the same against its inference rate (from profile_speed.py)
+├── <task>/throughput.{pdf,pgf}      the same against its inference rate
 ├── <task>/table.{tex,md}            size, training time and final metrics, best in bold, second underlined
 ├── <task>/qualitative_<signal>.pdf  the signal with two regions boxed and magnified for every featured model
 ├── <task>/panels/<signal>/          the renders those magnifications are cut from, rebuilt from the checkpoints
@@ -100,7 +100,7 @@ python scripts/report_paper.py --orbit 60               # plus an orbit GIF of e
 
 The magnified regions are found, not chosen: the two squares of fine detail where FUTON gains most squared error over the strongest baseline. Drawing the panels needs the signals in `data/` and a GPU; they are kept and reused, so recomposing a figure costs seconds. Figures come as PDF and as PGF for LaTeX. The `±` in the tables is a paired standard error over the signals: each signal's own level is removed before the error is taken, which is the uncertainty of a comparison between models rather than of an absolute level.
 
-Timings recorded during a sweep carry whatever else shared the node. `scripts/profile_speed.py` therefore times every model's inference on one signal per task inside one job, ideally an exclusive one, and writes `logs/speed/<task>.json`, which the throughput figure reads.
+The throughput figure takes each model's inference rate from the evaluation time its runs record (the whole image or volume, or one test view). Timings recorded during a sweep carry whatever else shared the node, so `scripts/profile_speed.py` times every model's inference on one signal per task inside one job, ideally an exclusive one, and writes `logs/speed/<task>.json` for a clean comparison.
 
 Or skip the report and read the runs directly:
 

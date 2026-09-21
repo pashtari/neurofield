@@ -1,0 +1,57 @@
+/* neurofield palette: the blue and orange of the paper's figures. */
+:root {
+  --md-primary-fg-color: #2a78d6;
+  --md-primary-fg-color--light: #5b9be3;
+  --md-primary-fg-color--dark: #1f5fae;
+  --md-accent-fg-color: #eb6834;
+  --md-accent-fg-color--transparent: #eb683420;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #1f5fae;
+  --md-accent-fg-color: #f08a5d;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Figures: centred, with a quiet caption. */
+.md-typeset figure {
+  margin: 1.25em auto;
+  text-align: center;
+}
+
+.md-typeset figure img,
+.md-typeset figure svg {
+  max-width: 100%;
+  background: white;
+  border-radius: 4px;
+}
+
+.md-typeset figcaption {
+  font-size: 0.8em;
+  color: var(--md-default-fg-color--light);
+  margin-top: 0.4em;
+}
+
+/* Result tables read better at a slightly smaller size. */
+.md-typeset table:not([class]) {
+  font-size: 0.72rem;
+}
+
+.md-typeset table:not([class]) th {
+  white-space: nowrap;
+}
+
+/* Hero grid on the landing page. */
+.grid.cards > ul > li {
+  border-radius: 6px;
+}
+
+/* Display math scrolls instead of being clipped on narrow screens. */
+.md-typeset div.arithmatex {
+  overflow-x: auto;
+  overflow-y: hidden;
+}

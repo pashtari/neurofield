@@ -106,7 +106,7 @@ def evaluate(
         indices: View indices; ``None`` evaluates all views.
         metrics: Mapping of names to functions ``fn(pred, target)`` on
             ``(3, H, W)`` images in ``[0, 1]``. ``None`` selects PSNR, SSIM, and
-            LPIPS (AlexNet), the standard novel view synthesis metrics.
+            LPIPS (VGG), the standard novel view synthesis metrics.
         chunk_size: Rays per forward pass; see :func:`render_image`.
         return_images: Include rendered images in the result.
 

@@ -20,6 +20,9 @@ data/
 paper/
 poster/
 slides/
-experiments/
+/experiments/
 logs/
 results/
+
+# MkDocs build
+site/

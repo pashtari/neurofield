@@ -70,19 +70,16 @@ def occupancy_inference(run: dict, path: Path, device) -> tuple[Callable, int]:
 
 
 def nerf_inference(run: dict, path: Path, device) -> tuple[Callable, int]:
-    """Render one test view, with the occupancy grid rebuilt from the field.
+    """Render one test view, as the benchmark scores it.
 
-    Only the field is checkpointed, and a fresh renderer starts fully
-    occupied, so the grid is rebuilt as training did before timing.
+    ``field_and_renderer`` rebuilds the occupancy grid from the checkpointed
+    field, so the timing covers rendering alone.
     """
     config = report.model_config(run)
     dataset = nf.nerf.BlenderDataset(
         path, "test", downsample=config["data"]["downsample"]
     )
     field, renderer = field_and_renderer(run, config, dataset, device)
-    with torch.no_grad():
-        for step in range(renderer.warmup_steps + renderer.update_interval):
-            renderer.update_occupancy(field, step)
     batch = dataset[0]
     background = dataset.background.to(device)
 

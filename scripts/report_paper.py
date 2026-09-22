@@ -740,7 +740,14 @@ def render_occupancy(signal: str, runs: list[dict], directory: Path, device) -> 
 
 
 def field_and_renderer(run: dict, config: dict, dataset, device):
-    """Rebuild a run's radiance field and its renderer."""
+    """Rebuild a run's radiance field and its renderer, occupancy grid included.
+
+    Only the field is checkpointed, and a fresh renderer starts fully
+    occupied, so the grid is rebuilt from the field as training's warmup did.
+    Without it, the faint density a model leaves in empty space, which the
+    grid pruned when the run was scored, is sampled everywhere and rendered
+    as fog: a sine network then looks far worse than its PSNR says.
+    """
     field = nf.nerf.RadianceField(
         density_net=build(run["setup"]), aabb=dataset.aabb, **config["field"]
     )
@@ -752,7 +759,11 @@ def field_and_renderer(run: dict, config: dict, dataset, device):
         near=dataset.near,
         far=dataset.far,
     )
-    return field.to(device), renderer.to(device)
+    field, renderer = field.to(device), renderer.to(device)
+    with torch.no_grad():
+        for step in range(renderer.warmup_steps + renderer.update_interval):
+            renderer.update_occupancy(field, step)
+    return field, renderer
 
 
 def render_nerf(signal: str, runs: list[dict], directory: Path, device) -> None:
@@ -780,7 +791,12 @@ def render_nerf(signal: str, runs: list[dict], directory: Path, device) -> None:
 
 
 def render_orbit(
-    signal: str, runs: list[dict], directory: Path, device, frames: int
+    signal: str,
+    runs: list[dict],
+    directory: Path,
+    device,
+    frames: int,
+    overwrite: bool = False,
 ) -> None:
     """An orbit of each model as a GIF, at the elevation the dataset uses.
 
@@ -799,7 +815,7 @@ def render_orbit(
     ]
     for run in runs:
         path = directory / f"{run['model']}.gif"
-        if path.exists():
+        if path.exists() and not overwrite:
             continue
         print(f"  orbiting {run['model']} on {signal}", flush=True)
         field, renderer = field_and_renderer(run, config, dataset, device)
@@ -1312,7 +1328,9 @@ def main() -> None:
                     for run in runs
                     if run["data"] == signal and run["model"] in FEATURED
                 ]
-                render_orbit(signal, chosen, directory, args.device, args.orbit)
+                render_orbit(
+                    signal, chosen, directory, args.device, args.orbit, args.overwrite
+                )
             figure = qualitative(task, signal, final, directory)
             # PDF only: a PGF of raster panels writes each one out beside it.
             figure.savefig(

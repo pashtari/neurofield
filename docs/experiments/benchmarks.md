@@ -2,7 +2,9 @@
 
 Twelve models on three tasks, at equal parameter count per task. The tables are `results/<task>/table.md` as `scripts/report_paper.py` writes them from the runs in `logs/`; the figures are the paper's. Bold marks the best value in a column and italics the second; ± is one standard error over the signals, after removing each signal's own level (a paired standard error).
 
-Two notes on the rows. **TensoRF** is the variant its authors recommend for the dimension: CP on images (the only one in 2D) and VM on volumes and radiance fields; both are in the configs. **WIRE** is the real Gabor variant (`nf.RealWIRE`) from the WIRE paper and code. Training times were measured on one A100 in jobs that shared their nodes, so they carry some noise; the ordering is robust, the second decimal is not.
+Two notes on the rows. **TensoRF** is the variant its authors recommend for the dimension: CP on images (the only one in 2D) and VM on volumes and radiance fields; both are in the configs. **WIRE** is the real Gabor variant (`nf.RealWIRE`) from the WIRE paper and code.
+
+Accuracy comes from the benchmark sweeps. Times are measured separately: for images and volumes every model was retrained alone on an exclusive A100 node after a warm-up pass, and the inference rates in the throughput panels come from the same kind of job (`scripts/profile_speed.py`). The radiance-field training times still come from the sweep's jobs, which shared their nodes and inflate launch-bound models (Instant-NGP trained about 1.6× slower beside neighbours on the other tasks); an exclusive rerun of the lego and hotdog scenes is queued.
 
 ## Images
 
@@ -10,18 +12,18 @@ Two notes on the rows. **TensoRF** is the variant its authors recommend for the 
 
 | Model | Params (k) | Train time (s) ↓ | PSNR (dB) ↑ | SSIM (%) ↑ | LPIPS ↓ |
 | --- | --- | --- | --- | --- | --- |
-| RFF | 199.7 | 9.6 | 29.80 ± 0.13 | 82.06 ± 0.84 | 0.3013 ± 0.0069 |
-| PE-MLP | 196.7 | 11.6 | 28.03 ± 0.13 | 73.43 ± 1.35 | 0.4191 ± 0.0069 |
-| MFN | 198.1 | 34.4 | 35.62 ± 0.15 | 92.16 ± 0.24 | 0.1567 ± 0.0041 |
-| SIREN | 198.9 | 13.0 | 33.56 ± 0.15 | 90.69 ± 0.27 | 0.1986 ± 0.0051 |
-| Gauss | 198.9 | 15.5 | 31.84 ± 0.22 | 86.48 ± 0.58 | 0.2292 ± 0.0052 |
-| WIRE | 199.3 | 18.6 | 33.14 ± 0.41 | 89.20 ± 0.96 | 0.1909 ± 0.0117 |
-| FINER | 198.9 | 14.6 | 35.94 ± 0.11 | 93.62 ± 0.26 | 0.1303 ± 0.0032 |
-| Instant-NGP | 195.3 | 26.9 | 36.76 ± 0.12 | 93.84 ± 0.19 | 0.1274 ± 0.0031 |
-| TensoRF | 202.0 | 10.1 | 36.59 ± 0.12 | 93.40 ± 0.21 | 0.1387 ± 0.0028 |
-| GA-Planes | 194.8 | *7.9* | 33.30 ± 0.19 | 89.27 ± 0.40 | 0.2091 ± 0.0047 |
-| FUTON-sinc | 194.4 | 8.1 | **38.54** ± 0.10 | **95.53** ± 0.35 | **0.0976** ± 0.0026 |
-| FUTON-lanczos | 194.4 | **6.6** | *38.20* ± 0.10 | *95.24* ± 0.35 | *0.0998* ± 0.0027 |
+| RFF | 199.7 | 9.5 | 29.80 ± 0.13 | 82.06 ± 0.84 | 0.3013 ± 0.0070 |
+| PE-MLP | 196.7 | 11.5 | 28.03 ± 0.12 | 73.43 ± 1.36 | 0.4191 ± 0.0070 |
+| MFN | 198.1 | 24.7 | 35.62 ± 0.16 | 92.16 ± 0.24 | 0.1567 ± 0.0042 |
+| SIREN | 198.9 | 12.7 | 33.56 ± 0.15 | 90.69 ± 0.27 | 0.1986 ± 0.0050 |
+| Gauss | 198.9 | 15.0 | 31.84 ± 0.22 | 86.48 ± 0.58 | 0.2292 ± 0.0052 |
+| WIRE | 199.3 | 17.1 | 33.14 ± 0.41 | 89.20 ± 0.95 | 0.1909 ± 0.0117 |
+| FINER | 198.9 | 14.3 | 35.94 ± 0.11 | 93.62 ± 0.26 | 0.1303 ± 0.0032 |
+| Instant-NGP | 195.3 | 18.8 | 36.76 ± 0.12 | 93.84 ± 0.18 | 0.1274 ± 0.0030 |
+| TensoRF | 202.0 | 9.9 | 36.59 ± 0.12 | 93.43 ± 0.21 | 0.1390 ± 0.0029 |
+| GA-Planes | 194.8 | *7.8* | 33.24 ± 0.19 | 89.24 ± 0.39 | 0.2094 ± 0.0048 |
+| FUTON-sinc | 194.4 | 8.1 | **38.54** ± 0.10 | **95.53** ± 0.34 | **0.0976** ± 0.0026 |
+| FUTON-lanczos | 194.4 | **6.1** | *38.20* ± 0.10 | *95.24* ± 0.34 | *0.0998* ± 0.0026 |
 
 <figure markdown="span">
   ![Kodak: convergence, training-time trade-off and throughput](../assets/results_image.svg){ width="960" }
@@ -40,18 +42,18 @@ Five Stanford shapes voxelized at $256^3$, about 132k parameters per model, 2000
 
 | Model | Params (k) | Train time (s) ↓ | Armadillo | Dragon | Happy Buddha | Lucy | Thai Statue | Mean IoU (%) ↑ |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| RFF | 132.2 | **7.5** | 99.85 | 99.84 | 99.68 | 98.76 | 99.66 | 99.56 ± 0.18 |
-| PE-MLP | 131.3 | 9.9 | 98.96 | 98.53 | 98.96 | 98.21 | 98.19 | 98.57 ± 0.14 |
-| MFN | 133.8 | 20.4 | 99.16 | 97.99 | 97.93 | 98.64 | 99.12 | 98.57 ± 0.29 |
+| RFF | 132.2 | *7.4* | 99.85 | 99.84 | 99.68 | 98.76 | 99.66 | 99.56 ± 0.18 |
+| PE-MLP | 131.3 | 9.8 | 98.96 | 98.53 | 98.96 | 98.21 | 98.19 | 98.57 ± 0.14 |
+| MFN | 133.8 | 19.3 | 99.16 | 97.99 | 97.93 | 98.64 | 99.12 | 98.57 ± 0.29 |
 | SIREN | 132.9 | 10.5 | 99.00 | 99.34 | 99.57 | 99.09 | 98.76 | 99.15 ± 0.14 |
-| Gauss | 132.9 | 12.2 | 99.70 | 99.75 | 99.59 | 99.62 | 99.41 | 99.61 ± 0.05 |
-| WIRE | 133.4 | 15.4 | 99.65 | 99.70 | 99.60 | 99.60 | 99.45 | 99.60 ± 0.04 |
-| FINER | 132.9 | 11.8 | 99.54 | 99.67 | 99.70 | 99.56 | 99.41 | 99.58 ± 0.05 |
-| Instant-NGP | 132.4 | 26.7 | 99.91 | *99.90* | 99.81 | **99.90** | 99.81 | 99.87 ± 0.04 |
-| TensoRF | 130.0 | *7.6* | 99.82 | 99.86 | 99.79 | 99.60 | 99.56 | 99.73 ± 0.03 |
-| GA-Planes | 132.0 | 9.9 | 99.80 | 99.87 | 99.88 | 99.80 | 99.71 | 99.81 ± 0.04 |
-| FUTON-sinc | 131.7 | 11.2 | **99.95** | **99.91** | **99.92** | 99.87 | **99.86** | **99.90** ± 0.03 |
-| FUTON-lanczos | 131.7 | 8.8 | **99.95** | *99.90* | **99.92** | *99.88* | *99.85* | **99.90** ± 0.03 |
+| Gauss | 132.9 | 12.1 | 99.70 | 99.75 | 99.59 | 99.62 | 99.41 | 99.61 ± 0.05 |
+| WIRE | 133.4 | 13.8 | 99.65 | 99.70 | 99.60 | 99.60 | 99.45 | 99.60 ± 0.04 |
+| FINER | 132.9 | 11.7 | 99.54 | 99.67 | 99.70 | 99.56 | 99.41 | 99.58 ± 0.05 |
+| Instant-NGP | 132.4 | 17.2 | 99.91 | *99.90* | 99.81 | **99.90** | 99.81 | 99.87 ± 0.04 |
+| TensoRF | 130.0 | **6.3** | 99.82 | 99.86 | 99.80 | 99.59 | 99.57 | 99.73 ± 0.03 |
+| GA-Planes | 132.0 | 9.5 | 99.81 | 99.86 | 99.88 | 99.79 | 99.72 | 99.81 ± 0.04 |
+| FUTON-sinc | 131.7 | 10.3 | **99.95** | **99.91** | **99.92** | 99.87 | **99.86** | **99.90** ± 0.03 |
+| FUTON-lanczos | 131.7 | 7.5 | **99.95** | *99.90* | **99.92** | *99.88* | *99.85* | **99.90** ± 0.03 |
 
 <figure markdown="span">
   ![Occupancy: convergence, training-time trade-off and throughput](../assets/results_occupancy.svg){ width="960" }
@@ -120,6 +122,6 @@ Test-view PSNR in dB. `results/nerf/table.md` also lists SSIM and LPIPS per scen
 
 - **Accuracy.** FUTON leads every column of the image table by a margin well beyond the error bars (1.8 dB over Instant-NGP), and the mean IoU on volumes, where the hash grid is its only close competitor. On radiance fields the mean is a narrow lead over FINER and SIREN, within one standard error.
 - **Speed.** FUTON-lanczos is the fastest model to train on images and the fastest radiance field; on volumes RFF and TensoRF train faster but reach a lower IoU. Instant-NGP, the other strong model, is 2 to 3× slower than FUTON here; its hash grid runs in plain PyTorch, like every other model, rather than in tiny-cuda-nn's fused kernels.
-- **The two bases** trade a little accuracy for speed: Lanczos costs 0.3 dB on images and nothing on volumes, and trains 8 to 20 % faster.
+- **The two bases** trade a little accuracy for speed: Lanczos costs 0.3 dB on images and nothing on volumes, and trains about a quarter faster on both; on radiance fields the gain is 8 %, since ray marching sets the pace there.
 
 The [ablations](ablations.md) take FUTON apart, and [Reproducing the paper](reproduce.md) has the commands that produced every number above.

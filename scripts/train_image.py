@@ -10,7 +10,7 @@ from typing import Any
 
 import torch
 from PIL import Image
-from train_common import ROOT, build, record, resolve, run
+from train_common import ROOT, build, record, resolve, run, warm_up
 
 import neurofield as nf
 
@@ -27,9 +27,12 @@ def fit(
     config: dict, model: dict, path: Path, out: Path, device: torch.device
 ) -> dict[str, Any]:
     model_class, kwargs = build(model)
+    net = model_class(in_features=2, out_features=3, **kwargs)
+    train_dataset = nf.ImageCoordinateDataset(path, **config["data"])
+    warm_up(net, train_dataset, device)
     res = nf.train(
-        model_class(in_features=2, out_features=3, **kwargs),
-        nf.ImageCoordinateDataset(path, **config["data"]),
+        net,
+        train_dataset,
         nf.ImageCoordinateDataset(path),
         metrics={
             "psnr": nf.psnr,

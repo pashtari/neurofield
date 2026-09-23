@@ -12,7 +12,7 @@ from typing import Any
 
 import torch
 from PIL import Image
-from train_common import ROOT, build, record, run
+from train_common import ROOT, build, record, run, warm_up_field
 
 import neurofield as nf
 
@@ -41,6 +41,7 @@ def fit(
         near=train_dataset.near,
         far=train_dataset.far,
     )
+    warm_up_field(field, train_dataset, device)
     res = nf.nerf.train(
         field,
         renderer,

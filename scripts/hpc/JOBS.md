@@ -83,19 +83,25 @@ python scripts/report_paper.py          # -> results/, the paper's figures
 python scripts/report_paper.py --no-panels   # without the renders, which need a GPU
 ```
 
-Timings from the sweeps carry whatever else shared the node, so measure speed
-in one exclusive job instead, which also retrains one signal per task to time
-training without neighbours:
+Timings from the sweeps carry whatever else shared the node: on a clean node
+Instant-NGP trained 1.7x faster, MFN and TensoRF-VM 1.2x, the rest within a
+few percent. So the sweeps give the accuracy and separate exclusive jobs give
+every time: `profile_speed.py` times inference on one signal per task, and
+the timing runs retrain every model alone, after a warm-up pass that keeps
+kernel compilation out of the clock, into `logs/timing/<task>/`. The report
+takes its times from there wherever such a run exists (all 24 images and 5
+shapes; for NeRF the scenes below) and its accuracy from the sweeps.
 
 ```bash
-sbatch --clusters=accelgor --exclusive --time=3:00:00 --gpus-per-node=1 \
-  --cpus-per-task=12 --chdir=$VSC_DATA/projects/neurofield \
-  --output=logs/slurm/%x-%j.out --job-name=nf-speed --wrap \
+common="--clusters=accelgor --exclusive --gpus-per-node=1 --chdir=$VSC_DATA/projects/neurofield --output=logs/slurm/%x-%j.out"
+sbatch $common --time=5:00:00 --job-name=nf-timing-2d --wrap \
   "source $VSC_DATA/venvs/neurofield-env/bin/activate \
    && python scripts/profile_speed.py \
-   && python scripts/train_image.py --data data/Kodak/kodim17.png --overwrite --log-dir logs/timing/image \
-   && python scripts/train_occupancy.py --data data/occupancy/lucy.ply --overwrite --log-dir logs/timing/occupancy \
-   && python scripts/train_nerf.py --data data/nerf/blender/lego --overwrite --log-dir logs/timing/nerf"
+   && python scripts/train_image.py --overwrite --log-dir logs/timing/image \
+   && python scripts/train_occupancy.py --overwrite --log-dir logs/timing/occupancy"
+sbatch $common --time=4:00:00 --job-name=nf-timing-nerf --wrap \
+  "source $VSC_DATA/venvs/neurofield-env/bin/activate \
+   && python scripts/train_nerf.py --data data/nerf/blender/lego data/nerf/blender/hotdog --overwrite --log-dir logs/timing/nerf"
 ```
 
 `report_paper.py` writes everything the paper needs into `results/`, and

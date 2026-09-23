@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from train_common import ROOT, build, record, run
+from train_common import ROOT, build, record, run, warm_up
 
 import neurofield as nf
 
@@ -21,9 +21,12 @@ def fit(
 ) -> dict[str, Any]:
     model_class, kwargs = build(model)
     data_kwargs = {**config["data"], "item_id": path.stem}
+    net = model_class(in_features=3, out_features=1, **kwargs)
+    train_dataset = nf.OccupancyCoordinateDataset(path, **data_kwargs)
+    warm_up(net, train_dataset, device)
     res = nf.train(
-        model_class(in_features=3, out_features=1, **kwargs),
-        nf.OccupancyCoordinateDataset(path, **data_kwargs),
+        net,
+        train_dataset,
         nf.OccupancyCoordinateDataset(path, **{**data_kwargs, "subsample": 1.0}),
         metrics={"iou": nf.iou},
         # Rendering a mesh needs a display, which compute nodes lack; recreate

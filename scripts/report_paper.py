@@ -39,6 +39,7 @@ seconds and no GPU.
 
 import argparse
 import json
+import math
 import re
 import warnings
 from collections.abc import Sequence
@@ -323,15 +324,59 @@ def curves(runs: list[dict[str, Any]]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def timed(runs: list[dict[str, Any]], task: str) -> list[dict[str, Any]]:
+    """The runs with their times taken from the exclusive-node timing runs.
+
+    Accuracy comes from the sweeps, whose jobs shared their nodes, so their
+    times carry whatever else ran beside them. logs/timing/<task> holds the
+    same runs trained alone on an exclusive node, after a warm-up pass; where
+    such a run exists it replaces the sweep's (training is deterministic, so
+    the metrics agree), and the other runs lose their times, so that every
+    time in the tables and figures is a clean one and the mean over signals is
+    taken over the timed ones. Without timing runs, the sweep's times stand.
+    """
+    directory = ROOT / "logs" / "timing" / task
+    if not directory.exists():
+        return runs
+    clean = {(run["data"], run["model"]): run for run in read(directory, task)}
+    untimed = {"train_time": math.nan}
+    return [
+        clean.get(
+            (run["data"], run["model"]),
+            run
+            | untimed
+            | {"history": [entry | {"elapsed": math.nan} for entry in run["history"]]},
+        )
+        for run in runs
+    ]
+
+
+def profiled(final: pd.DataFrame, task: str) -> pd.DataFrame:
+    """The inference rates from the exclusive-node profile, where it exists.
+
+    scripts/profile_speed.py times every model on one signal per task in one
+    allocation; its rate, the signal per second, replaces the rate a run's
+    own evaluation gave, which was measured beside the run's neighbours.
+    """
+    path = ROOT / "logs" / "speed" / f"{task}.json"
+    if not path.exists():
+        return final
+    rates = {
+        "TensoRF" if model == TENSORF[task] else model: 1 / entry["seconds"]
+        for model, entry in json.loads(path.read_text()).items()
+    }
+    return final.assign(speed=final["model"].map(rates).fillna(final["speed"]))
+
+
 def load(task: str) -> tuple[list[dict[str, Any]], pd.DataFrame, pd.DataFrame]:
     """A task's runs, its final metrics and its curves, with one TensoRF."""
     others = {"TensoRF", "TensoRF-CP", "TensoRF-VM"} - {TENSORF[task]}
     runs = [
         run | {"model": "TensoRF" if run["model"] == TENSORF[task] else run["model"]}
-        for run in read(ROOT / "logs" / task, task)
+        for run in timed(read(ROOT / "logs" / task, task), task)
         if run["model"] not in others
     ]
-    return runs, results(runs), curves(runs)
+    return runs, profiled(results(runs), task), curves(runs)
 
 
 def model_config(run: dict[str, Any]) -> dict[str, Any]:

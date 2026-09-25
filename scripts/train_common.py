@@ -115,6 +115,41 @@ def record(
     }
 
 
+def warm_up(model: torch.nn.Module, dataset: Any, device: torch.device) -> None:
+    """One forward and backward pass before training is timed.
+
+    The first pass through a model compiles and autotunes its kernels, which
+    takes the Triton products of FUTON's local bases about three seconds and
+    would otherwise land in the training time of a run that trains alone in
+    its process. The pass steps no optimizer and leaves the parameters as
+    they were; ``nf.train`` reseeds before it draws its own batches.
+    """
+    model.to(device).train()
+    model(dataset[0]["input"].to(device)).float().sum().backward()
+    model.zero_grad(set_to_none=True)
+
+
+def warm_up_field(field: torch.nn.Module, dataset: Any, device: torch.device) -> None:
+    """One occupancy update and one rendered ray batch before training is timed.
+
+    A throwaway renderer takes the update, so the one that trains starts from
+    the same empty grid as in the sweeps.
+    """
+    field.to(device).train()
+    renderer = nf.nerf.create_renderer(
+        backend="nerfacc" if nf.nerf.is_nerfacc_available() else "pytorch",
+        aabb=dataset.aabb,
+        near=dataset.near,
+        far=dataset.far,
+    ).to(device)
+    renderer.update_occupancy(field, 0)
+    batch = dataset[0]
+    rays_o = batch["rays_o"].reshape(-1, 3)[:4096].to(device)
+    rays_d = batch["rays_d"].reshape(-1, 3)[:4096].to(device)
+    renderer(field, rays_o, rays_d)["rgb"].float().sum().backward()
+    field.zero_grad(set_to_none=True)
+
+
 def run(
     task: str, data: Sequence[Path], fit: FitFn, prepare: PrepareFn | None = None
 ) -> None:

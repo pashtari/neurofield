@@ -32,12 +32,12 @@ Most implicit neural representations hide their prior in the nonlinearity: sines
 
 ## Results
 
-Every model of a task has the same parameter budget, the hyperparameters of its authors' code, and a learning rate chosen on the task. Times are mean training times per signal on one A100. The [benchmarks page](https://pashtari.github.io/neurofield/experiments/benchmarks/) has every model, metric and error bar.
+Every model of a task has the same parameter budget, the hyperparameters of its authors' code, and a learning rate chosen on the task. Times are mean training times per signal on an A100: for images and volumes every model was retrained alone on an exclusive node, for radiance fields the times come from the sweep's shared jobs. The [benchmarks page](https://pashtari.github.io/neurofield/experiments/benchmarks/) has every model, metric and error bar.
 
 | Task | Signals | Params | FUTON-sinc | FUTON-lanczos | Strongest baseline |
 | --- | --- | --- | --- | --- | --- |
-| Images (Kodak) | 24 | 195k | **38.54 dB** in 8.1 s | 38.20 dB in **6.6 s** | Instant-NGP, 36.76 dB in 26.9 s |
-| Occupancy (Stanford) | 5 | 132k | **99.90 % IoU** in 11.2 s | **99.90 % IoU** in 8.8 s | Instant-NGP, 99.87 % in 26.7 s |
+| Images (Kodak) | 24 | 195k | **38.54 dB** in 8.1 s | 38.20 dB in **6.1 s** | Instant-NGP, 36.76 dB in 18.8 s |
+| Occupancy (Stanford) | 5 | 132k | **99.90 % IoU** in 10.3 s | **99.90 % IoU** in 7.5 s | Instant-NGP, 99.87 % in 17.2 s |
 | Radiance fields (Blender) | 8 | 75k | **28.95 dB** in 343 s | 28.93 dB in **315 s** | FINER, 28.85 dB in 445 s |
 
 <p align="center">

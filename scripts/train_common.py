@@ -52,13 +52,13 @@ def build(model: dict[str, Any]) -> tuple[type[torch.nn.Module], dict[str, Any]]
 
 
 def resolve(value: Any, **sizes: int) -> Any:
-    """Evaluate size expressions such as ``"max(H, W) // 2"``, recursively."""
+    """Evaluate size expressions such as ``"max(H, W) // 2"`` or ``"min(H, W)"``, recursively."""
     if isinstance(value, dict):
         return {key: resolve(item, **sizes) for key, item in value.items()}
     if isinstance(value, list):
         return [resolve(item, **sizes) for item in value]
-    if isinstance(value, str) and re.fullmatch(r"[HW\d\s()+\-*/,max]+", value):
-        return eval(value, {"__builtins__": {}, "max": max}, sizes)
+    if isinstance(value, str) and re.fullmatch(r"[HW\d\s()+\-*/,maxin]+", value):
+        return eval(value, {"__builtins__": {}, "max": max, "min": min}, sizes)
     return value
 
 

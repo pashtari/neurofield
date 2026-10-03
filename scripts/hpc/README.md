@@ -105,8 +105,9 @@ the commit in its output, e.g. `commit: 1a2b3c4`. Jobs are named
 `nf-<task>[-<signal>][-<model>]`, naming whatever the job runs only one of, so
 `squeue` and the log files say what is running. Pass `--job-name=` to override.
 A job array runs one signal per task: pass `--array=801-900`, and every `%a` in
-the arguments becomes the task id, zero-padded to four digits, as the
-super-resolution sweep does with `--data data/DIV2K/DIV2K_valid_HR/%a.png`.
+the arguments becomes the task id, `%4a` the id zero-padded to four digits and
+`%2a` to two, as the super-resolution sweep does with
+`--data data/DIV2K/DIV2K_valid_HR/%4a.png`.
 It also prints the scheduler's estimated start time, e.g.
 
 ```

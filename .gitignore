@@ -16,6 +16,7 @@ Thumbs.db
 .claude/
 .old_experiments/
 .archived_notebooks/
+.archived_logs/
 data/
 paper/
 poster/

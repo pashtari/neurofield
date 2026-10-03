@@ -23,8 +23,10 @@ Writes results/, which holds the paper's figures and tables and nothing else:
                                      rebuilt from the checkpoints and kept, so that
                                      recomposing a figure needs no GPU
     ablation/basis.{tex,md}          every basis at the benchmark's size
-    ablation/components.{tex,md}     the combiner and the decoder, for both bases
-    ablation/rank_<basis>.{pdf,pgf}  IoU against the CP rank at each K
+    ablation/combiner_decoder.{tex,md}  the combiner and the decoder, for both bases
+    ablation/beta_<basis>.{pdf,pgf}  PSNR against the rank fraction at each
+                                     component fraction, and alpha_<basis> the
+                                     reverse
 
 Tables mark the best value in bold and the second underlined. Drawing the panels
 needs the signals in data/ and a GPU; --no-panels leaves them out, and
@@ -68,7 +70,7 @@ from matplotlib.ticker import (
     StrMethodFormatter,
 )
 from PIL import Image
-from train_common import ROOT, build, merge
+from train_common import ROOT, build, merge, resolve
 from train_super_resolution import INTERPOLATIONS, low_resolution
 
 import neurofield as nf
@@ -202,18 +204,21 @@ def text_width(text: str, weight: str = "normal") -> float:
 
 UNITS = {"psnr": "{:.2f} dB", "iou": "{:.2f}%"}
 
-# The FUTON ablations, all on the occupancy task: the bases from the smoothest
-# to the most local, and the variants of the two stages after the basis, both
-# for the bases the benchmark uses.
+# The FUTON ablations, all on the image task: the bases from the smoothest to
+# the most local, and the variants of the two stages after the basis, both for
+# the bases the benchmark uses. The components study sets the components per
+# axis as a fraction alpha of the pixels and the rank as a fraction beta of
+# the smaller count, both named as decimals in the model's name.
 STUDIES = ("basis", "components_rank", "tensor_net", "decoder")
-GRID = re.compile(r"FUTON-(?P<basis>\w+)-K(?P<components>\d+)-R(?P<rank>\d+)$")
+GRID = re.compile(r"FUTON-(?P<basis>\w+)-a(?P<alpha>[\d.]+)-b(?P<beta>[\d.]+)$")
+FRACTIONS = {0.125: "1/8", 0.25: "1/4", 0.5: "1/2", 1.0: "1", 2.0: "2"}
 BASES = ("Cosine", "Chebyshev", "Legendre", "Triangle", "Lanczos", "Sinc")
 PAIR = ("sinc", "lanczos")
 VARIANTS = {  # row: the model it stands for, in whichever study ran it
     "CP, MLP": "FUTON-{basis}",
     "TR, MLP": "FUTON-{basis}-TR",
-    "CP, linear (R = 342)": "FUTON-{basis}-linear",
-    "CP, linear (R = 218)": "FUTON-{basis}-linear-R218",
+    "CP, linear (R = 302)": "FUTON-{basis}-linear",
+    "CP, linear (R = 224)": "FUTON-{basis}-linear-R224",
 }
 PARAMS = ("", "# Params (k)", None, 1)  # the column every table opens with
 DASHES = ("", (4, 2), (1, 1.5))  # solid, dashed, dotted
@@ -1215,18 +1220,28 @@ def study(name: str) -> list[dict]:
         return []
     config = ROOT / "configs" / "ablation-futon" / f"{name}.yaml"
     setups = yaml.safe_load(config.read_text())["models"]
+    runs = read(log_dir, "image")
     return [
         run
-        for run in read(log_dir, "occupancy")
-        if setups.get(run["model"]) == run["setup"]
+        for run in runs
+        if resolve_setup(setups.get(run["model"]), run) == run["setup"]
     ]
 
 
+def resolve_setup(setup: dict | None, run: dict) -> dict | None:
+    """A config entry with the image's size filled in, as the run recorded it."""
+    if setup is None:
+        return None
+    path = ROOT / SIGNALS["image"].format(run["data"])
+    width, height = Image.open(path).size
+    return resolve(setup, H=height, W=width)
+
+
 def summarize(runs: list[dict]) -> pd.DataFrame:
-    """Each model's mean size, time and IoU over the shapes, with its error."""
+    """Each model's mean size, time and PSNR over the images, with its error."""
     final = results(runs)
-    summary = final.groupby("model")[["parameters", "time", "iou"]].mean()
-    return summary.assign(error=paired_error(final, ("iou",))[("mean", "iou")])
+    summary = final.groupby("model")[["parameters", "time", "psnr"]].mean()
+    return summary.assign(error=paired_error(final, ("psnr",))[("mean", "psnr")])
 
 
 def basis_table(runs: list[dict]) -> dict[str, str]:
@@ -1236,9 +1251,9 @@ def basis_table(runs: list[dict]) -> dict[str, str]:
     spec = {
         "parameters": PARAMS,
         "time": ("", "Train time (s)", False, 1),
-        "iou": ("", "IoU (%)", True, 2),
+        "psnr": ("", "PSNR (dB)", True, 2),
     }
-    errors = summary[["error"]].rename(columns={"error": "iou"})
+    errors = summary[["error"]].rename(columns={"error": "psnr"})
     return table(summary, spec, errors, order=BASES, index="Basis")
 
 
@@ -1251,7 +1266,7 @@ def component_table(summaries: dict[str, pd.DataFrame]) -> dict[str, str]:
     spec = {"parameters": PARAMS}
     for basis in PAIR:
         spec[f"time_{basis}"] = (f"FUTON-{basis}", "Train time (s)", False, 1)
-        spec[f"iou_{basis}"] = (f"FUTON-{basis}", "IoU (%)", True, 2)
+        spec[f"psnr_{basis}"] = (f"FUTON-{basis}", "PSNR (dB)", True, 2)
 
     values, errors = {}, {}
     for label, template in VARIANTS.items():
@@ -1266,9 +1281,9 @@ def component_table(summaries: dict[str, pd.DataFrame]) -> dict[str, str]:
         values[label] = {"parameters": rows[PAIR[0]]["parameters"]} | {
             f"{field}_{basis}": rows[basis][field]
             for basis in PAIR
-            for field in ("time", "iou")
+            for field in ("time", "psnr")
         }
-        errors[label] = {f"iou_{basis}": rows[basis]["error"] for basis in PAIR}
+        errors[label] = {f"psnr_{basis}": rows[basis]["error"] for basis in PAIR}
     if not values:
         return {}
     return table(
@@ -1281,19 +1296,27 @@ def component_table(summaries: dict[str, pd.DataFrame]) -> dict[str, str]:
 
 
 def grid_figures(runs: list[dict], out_dir: Path) -> None:
-    """IoU against the rank at each K, and against K at each rank, per basis."""
+    """PSNR against the rank fraction at each component fraction, and the reverse.
+
+    The components per axis are ``alpha`` times the pixels and the rank
+    ``beta`` times the smaller component count, so the figures read in units
+    of the image rather than in absolute sizes.
+    """
     data = results(runs).assign(iteration=0)  # one evaluation, the last
     data = data.join(data["model"].str.extract(GRID))
-    data[["components", "rank"]] = data[["components", "rank"]].astype(int)
-    data["iou"] = within_signal(data, "iou")
-    labels = {"rank": "Rank $R$", "components": "Components $K$"}
+    data[["alpha", "beta"]] = data[["alpha", "beta"]].astype(float)
+    data["psnr"] = within_signal(data, "psnr")
+    labels = {
+        "alpha": r"Components per pixel $\alpha$",
+        "beta": r"Rank over components $\beta$",
+    }
     for basis, rows in data.groupby("basis"):
-        for axis, hue in (("rank", "components"), ("components", "rank")):
+        for axis, hue in (("beta", "alpha"), ("alpha", "beta")):
             figure, plot = plt.subplots(figsize=SIZE)
             sns.lineplot(
                 data=rows,
                 x=axis,
-                y="iou",
+                y="psnr",
                 hue=hue,
                 style=hue,
                 markers=True,
@@ -1305,14 +1328,19 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
                 markeredgewidth=0.5,
                 ax=plot,
             )
-            plot.set(xscale="log", xlabel=labels[axis], ylabel="IoU (%)")
+            plot.set(xscale="log", xlabel=labels[axis], ylabel="PSNR (dB)")
             # The levels double, so tick them exactly, without log minor ticks.
             levels = sorted(rows[axis].unique())
-            plot.set_xticks(levels, levels)
+            plot.set_xticks(
+                levels, [FRACTIONS.get(level, f"{level:g}") for level in levels]
+            )
             plot.xaxis.set_minor_locator(NullLocator())
             # A white ground under the legend, since "best" still puts it over
             # a curve in a panel this small.
+            handles, texts = plot.get_legend_handles_labels()
             plot.legend(
+                handles,
+                [FRACTIONS.get(float(text), text) for text in texts],
                 title=labels[hue].split()[-1],
                 framealpha=0.85,
                 edgecolor="none",
@@ -1327,7 +1355,7 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
 def study_curves(
     curve: pd.DataFrame, styles: dict[str, tuple[str, str, tuple]], path: Path
 ) -> None:
-    """IoU against training time for a study's models, with its own legend.
+    """PSNR against training time for a study's models, with its own legend.
 
     ``styles`` gives each model its label, colour and dashes, in the order the
     legend takes them. The band is one within-signal standard error, as in the
@@ -1336,13 +1364,13 @@ def study_curves(
     curve = curve[curve["model"].isin(styles)]
     curve = curve.assign(
         time=curve.groupby(["model", "iteration"])["time"].transform("mean"),
-        iou=within_signal(curve, "iou"),
+        psnr=within_signal(curve, "psnr"),
     )
     figure, plot = plt.subplots(figsize=(2.6, 2.1))
     sns.lineplot(
         data=curve,
         x="time",
-        y="iou",
+        y="psnr",
         hue="model",
         hue_order=list(styles),
         palette={model: color for model, (_, color, _) in styles.items()},
@@ -1354,17 +1382,16 @@ def study_curves(
         ax=plot,
     )
     means = curve.groupby(["model", "iteration"], as_index=False)[
-        ["iou", "time"]
+        ["psnr", "time"]
     ].mean()
-    low, high = y_range(means, "iou")
-    low = max(low, FLOOR["occupancy"])
-    shown = means[means["iou"].between(low, high)]["time"]
+    low, high = y_range(means, "psnr")
+    shown = means[means["psnr"].between(low, high)]["time"]
     plot.set(
         xscale="log",
         xlim=(shown.min() / 1.1, means["time"].max() * 1.1),
         ylim=(low, high),
         xlabel="Training time (s)",
-        ylabel="IoU (%)",
+        ylabel="PSNR (dB)",
     )
     log_ticks(plot.xaxis)
     handles = [

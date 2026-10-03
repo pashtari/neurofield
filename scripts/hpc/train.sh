@@ -12,9 +12,10 @@
 # default hour covers one image, one shape, one NeRF model, or one
 # super-resolution image; short jobs are scheduled sooner, and finished runs
 # are skipped when a job is resubmitted. A job array runs one signal per task:
-# every %a in the arguments becomes the task id, zero-padded to four digits.
+# every %a in the arguments becomes the task id, and %4a the id zero-padded to
+# four digits (DIV2K names), %2a to two (Kodak names).
 #     scripts/hpc/train.sh --clusters=accelgor --array=801-900 super_resolution \
-#       --data data/DIV2K/DIV2K_valid_HR/%a.png
+#       --data data/DIV2K/DIV2K_valid_HR/%4a.png
 #
 # The script runs in three places:
 #   local machine: pushes local commits, connects over SSH, and reruns itself
@@ -64,10 +65,10 @@ if [[ -z ${SLURM_JOB_ID:-} ]]; then
     echo "usage: $0 [sbatch options] <image|occupancy|nerf|super_resolution> [options]" >&2
     exit 2
   fi
-  # Name the job nf-<task>[-<signal>][-<model>], naming only what is unique,
-  # so that squeue and logs/slurm/<name>-<jobid>.out say what is running.
+  # Name the job nf-<task>[-<config>][-<signal>][-<model>], naming only what is
+  # unique, so that squeue and logs/slurm/<name>-<jobid>.out say what is running.
   name=nf-$1
-  for option in data models; do
+  for option in config data models; do
     values=()
     collect=""
     for arg in "$@"; do
@@ -78,7 +79,7 @@ if [[ -z ${SLURM_JOB_ID:-} ]]; then
         *) [[ -n $collect ]] && values+=("$arg") ;;
       esac
     done
-    if [[ ${#values[@]} -eq 1 && ${values[0]} != *%a* ]]; then
+    if [[ ${#values[@]} -eq 1 && ${values[0]} != *%* ]]; then
       value=${values[0]%/}  # NeRF scenes are directories
       value=${value##*/}
       name+=-${value%.*}
@@ -117,7 +118,10 @@ fi
 task=${1:?usage: sbatch scripts/hpc/train.sh <image|occupancy|nerf|super_resolution> [options]}
 shift
 if [[ -n ${SLURM_ARRAY_TASK_ID:-} ]]; then
-  set -- "${@//%a/$(printf %04d "$SLURM_ARRAY_TASK_ID")}"
+  for width in 2 3 4 5 6; do
+    set -- "${@//%${width}a/$(printf "%0${width}d" "$SLURM_ARRAY_TASK_ID")}"
+  done
+  set -- "${@//%a/$SLURM_ARRAY_TASK_ID}"
 fi
 
 # Modules loaded on the login node would shadow the venv's libraries.

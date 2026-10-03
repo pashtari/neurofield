@@ -22,43 +22,46 @@ scripts/hpc/train.sh --clusters=accelgor --time=1:00:00 occupancy
 for scene in data/nerf/blender/*/; do
   scripts/hpc/train.sh --clusters=accelgor --time=4:00:00 nerf --data "$scene"
 done
-# One image per array task: every %a becomes the task id, zero-padded to four
-# digits. An image takes about 85 minutes on one GPU and the tasks backfill
-# singly, so a two-hour wall time starts them far sooner than one long job.
+# One image per array task: %4a becomes the task id, zero-padded to four digits.
+# An image takes about 85 minutes on one GPU and the tasks backfill singly, so
+# a two-hour wall time starts them far sooner than one long job.
 scripts/hpc/train.sh --clusters=accelgor --time=2:00:00 --array=801-900 super_resolution \
-  --data data/DIV2K/DIV2K_valid_HR/%a.png
+  --data data/DIV2K/DIV2K_valid_HR/%4a.png
 ```
 
 ## FUTON ablations
 
-Three studies on the occupancy task, each a config in `configs/ablation-futon/`
+Four studies on the image task, each a config in `configs/ablation-futon/`
 whose runs go to the folder of the same name in `logs/ablation-futon/`. All
-keep the benchmark's settings (256^3 grid, 2000 epochs, lr 1e-2), so only the
-model changes. The default model is the benchmark's FUTON: K=128 components,
-CP rank 218 and a one-layer MLP decoder (131,673 parameters).
+keep the benchmark's settings (24 Kodak images, 2000 epochs on 10% of the
+pixels, lr 3e-2), so only the model changes. The default model is the
+benchmark's FUTON: K = (H/2, W/2) components, CP rank 224 and a one-layer MLP
+decoder (194,435 parameters).
 
 | Study | Models | What varies |
 | --- | --- | --- |
 | `basis` | `FUTON-<basis>`, 6 | cosine, lanczos, sinc, triangle, chebyshev and legendre, at the default size |
-| `components_rank` | `FUTON-<basis>-K<K>-R<R>`, 32 | K and R over {32, 64, 128, 256}, for lanczos and sinc |
-| `tensor_net` | `FUTON-<basis>` and `FUTON-<basis>-TR`, 4 | a tensor-ring combiner against the default CP one, at K=128, for lanczos and sinc |
-| `decoder` | `FUTON-<basis>`, `-linear` and `-linear-R218`, 6 | the paper's linear decoder against the benchmark's MLP, at equal size and at equal rank |
+| `components_rank` | `FUTON-<basis>-a<alpha>-b<beta>`, 50 | K = (alpha H, alpha W) and R = beta min(K), both over {1/8, 1/4, 1/2, 1, 2}, for lanczos and sinc |
+| `tensor_net` | `FUTON-<basis>` and `FUTON-<basis>-TR`, 4 | a tensor-ring combiner against the default CP one, for lanczos and sinc |
+| `decoder` | `FUTON-<basis>`, `-linear` and `-linear-R224`, 6 | the paper's linear decoder against the benchmark's MLP, at equal size and at equal rank |
 
 A tensor ring of rank `r` has the size of a CP combiner of rank `r^2`; rank 15
-gives 137,476 parameters, the closest to the CP model's 131,673. The MLP
-decoder holds 47,961 of those parameters, 36% of the model, which a linear
-decoder returns to the combiner as CP rank 342 (131,671 parameters); rank 218
+gives 195,528 parameters, the closest to the CP model's 194,435. The MLP
+decoder holds 51,075 of those parameters, 26% of the model, which a linear
+decoder returns to the combiner as CP rank 302 (194,189 parameters); rank 224
 is kept as well, to separate the parameters from the nonlinearity. The CP
 models of `tensor_net` and `decoder` repeat those of `basis`, so that each
-study stands alone. A run takes about 25 s, so the 240 runs (48 models x 5
-shapes) take about 1.7 hours:
+study stands alone. One image per job keeps the jobs short:
 
 ```bash
-scripts/hpc/train.sh --clusters=accelgor occupancy --config configs/ablation-futon/basis.yaml
-scripts/hpc/train.sh --clusters=accelgor --time=2:00:00 occupancy \
-  --config configs/ablation-futon/components_rank.yaml
-scripts/hpc/train.sh --clusters=accelgor occupancy --config configs/ablation-futon/tensor_net.yaml
-scripts/hpc/train.sh --clusters=accelgor occupancy --config configs/ablation-futon/decoder.yaml
+for study in basis tensor_net decoder; do  # about half an hour each over the 24 images
+  scripts/hpc/train.sh --clusters=accelgor --time=1:30:00 image --config configs/ablation-futon/$study.yaml
+done
+# The components grid holds models up to 9.4M parameters, so one image per task.
+scripts/hpc/train.sh --clusters=accelgor --time=1:00:00 --array=1-24 image \
+  --config configs/ablation-futon/components_rank.yaml --data data/Kodak/kodim%2a.png
+scripts/hpc/train.sh --clusters=accelgor --time=1:00:00 nerf \
+  --config configs/ablation-futon/components_nerf.yaml --data data/nerf/blender/lego
 ```
 
 ## Overrides

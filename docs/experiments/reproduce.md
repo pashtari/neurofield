@@ -43,7 +43,7 @@ Finished runs are skipped, so an interrupted sweep restarts where it stopped, an
 ```bash
 python scripts/train_image.py --models Gauss --overwrite                       # rerun one model in place
 python scripts/train_image.py --set models.SIREN.train.lr=0.001 --log-dir logs/siren-lr
-python scripts/train_occupancy.py --config configs/ablation-futon/basis.yaml   # -> logs/ablation-futon/basis/
+python scripts/train_image.py --config configs/ablation-futon/basis.yaml       # -> logs/ablation-futon/basis/
 ```
 
 Each run directory holds `log.txt`, `log.json`, `checkpoint.pt`, the final reconstruction (images) or two rendered test views (NeRF; super-resolution saves none, the report renders them), and `results.json` with the training configuration, the model's `setup` from the YAML, `num_params`, `train_time`, the final `metrics` (NeRF: the mean over the 200 test views, with every view under `test_views`) and the `history`. Occupancy runs write no mesh, since rendering needs a display; the report rebuilds them from the checkpoints.
@@ -65,15 +65,17 @@ The FUTON ablations are configs in `configs/ablation-futon/`, run through the sa
 
 | Config | Task | Models | Varies |
 | --- | --- | --- | --- |
-| `basis.yaml` | occupancy | 6 | The six bases at the default size. |
-| `components_rank.yaml` | occupancy | 32 | $K$ and $R$ over {32, 64, 128, 256}, sinc and Lanczos. |
-| `tensor_net.yaml` | occupancy | 4 | Tensor-ring against CP, both bases. |
-| `decoder.yaml` | occupancy | 6 | Linear against MLP decoder, at equal size and at equal rank. |
+| `basis.yaml` | image | 6 | The six bases at the benchmark's size. |
+| `components_rank.yaml` | image | 50 | The components per axis as a fraction $\alpha$ of the pixels, $K = (\alpha H, \alpha W)$, and the rank as a fraction $\beta$ of the smaller count, $R = \beta \min(K_1, K_2)$, both over {1/8, 1/4, 1/2, 1, 2}, sinc and Lanczos. |
+| `tensor_net.yaml` | image | 4 | Tensor-ring against CP, both bases. |
+| `decoder.yaml` | image | 6 | Linear against MLP decoder, at equal size and at equal rank. |
 | `decoder_image.yaml` | image | 12 | The linear decoder along the iso-parameter curve, with MLP controls. |
 | `components_nerf.yaml` | nerf | 2 | $K = 256$ at the rank that pays for it, against the benchmark. |
 
+The image studies run on all 24 Kodak images at the benchmark's settings (2000 epochs on 10 % of the pixels per step, learning rate 3e-2); a model's name carries its fractions as decimals, so `FUTON-sinc-a0.5-b1` has $K = (H/2, W/2)$ and $R = H/2$.
+
 ```bash
-python scripts/train_occupancy.py --config configs/ablation-futon/components_rank.yaml
+python scripts/train_image.py --config configs/ablation-futon/components_rank.yaml
 python scripts/train_image.py --config configs/ablation-futon/decoder_image.yaml --data data/Kodak/kodim19.png
 python scripts/train_nerf.py --config configs/ablation-futon/components_nerf.yaml --data data/nerf/blender/lego
 ```
@@ -91,7 +93,7 @@ results/
 ├── <task>/table.{tex,md}            size, training time and final metrics, best in bold, second underlined
 ├── <task>/qualitative_<signal>.pdf  the signal with two regions boxed and magnified for every featured model
 ├── <task>/panels/<signal>/          the renders those magnifications are cut from, rebuilt from the checkpoints
-└── ablation/                        the basis table and plot, the combiner table and plot, IoU against rank and against K
+└── ablation/                        the basis table and plot, the combiner table and plot, PSNR against each fraction
 ```
 
 ```bash
@@ -126,7 +128,7 @@ for scene in data/nerf/blender/*/; do
   scripts/hpc/train.sh --clusters=accelgor --time=4:00:00 nerf --data "$scene"
 done
 scripts/hpc/train.sh --clusters=accelgor --time=2:00:00 --array=801-900 super_resolution \
-  --data data/DIV2K/DIV2K_valid_HR/%a.png   # one image per array task
+  --data data/DIV2K/DIV2K_valid_HR/%4a.png   # one image per array task
 scripts/hpc/pull_logs.sh
 python scripts/report_paper.py
 ```

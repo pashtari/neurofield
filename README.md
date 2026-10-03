@@ -155,16 +155,18 @@ print(nf.nerf.evaluate(field, renderer, test_set)["mean"])
 
 ## Reproducing the paper
 
-Three download scripts, three training scripts and one report script produce every table and figure.
+Four download scripts, four training scripts and one report script produce every table and figure.
 
 ```bash
 python scripts/download_kodak.py         # 24 Kodak images, about 30 MB
 python scripts/download_meshes.py        # 5 Stanford meshes, about 3 GB
 python scripts/download_blender.py       # 8 Blender scenes, about 2.4 GB
+python scripts/download_div2k.py         # 100 DIV2K images and their 4x downsamplings, about 450 MB
 
 python scripts/train_image.py            # 24 images x 12 models -> logs/image/<image>/<model>/
 python scripts/train_occupancy.py        # 5 shapes x 13 models  -> logs/occupancy/<shape>/<model>/
 python scripts/train_nerf.py             # 8 scenes x 13 models  -> logs/nerf/<scene>/<model>/
+python scripts/train_super_resolution.py # 100 images x 16 models -> logs/super_resolution/<image>/<model>/
 
 python scripts/report_paper.py           # tables and figures    -> results/
 ```

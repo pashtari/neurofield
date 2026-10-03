@@ -14,6 +14,7 @@ Every model of `configs/<task>.yaml` on every signal of the task:
 | image | 24 Kodak images x 12 models = 288 | ~3.5 h | `logs/image/<image>/<model>/` |
 | occupancy | 5 Stanford shapes x 13 models = 65 | ~25 min | `logs/occupancy/<shape>/<model>/` |
 | nerf | 8 Blender scenes x 13 models = 104 | ~2.5 h per scene | `logs/nerf/<scene>/<model>/` |
+| super_resolution | 100 DIV2K images x 16 models = 1600 | ~1.5 h per image | `logs/super_resolution/<image>/<model>/` |
 
 ```bash
 scripts/hpc/train.sh --clusters=accelgor --time=5:00:00 image
@@ -21,6 +22,11 @@ scripts/hpc/train.sh --clusters=accelgor --time=1:00:00 occupancy
 for scene in data/nerf/blender/*/; do
   scripts/hpc/train.sh --clusters=accelgor --time=4:00:00 nerf --data "$scene"
 done
+# One image per array task: every %a becomes the task id, zero-padded to four
+# digits. An image takes about 85 minutes on one GPU and the tasks backfill
+# singly, so a two-hour wall time starts them far sooner than one long job.
+scripts/hpc/train.sh --clusters=accelgor --time=2:00:00 --array=801-900 super_resolution \
+  --data data/DIV2K/DIV2K_valid_HR/%a.png
 ```
 
 ## FUTON ablations
@@ -90,7 +96,8 @@ every time: `profile_speed.py` times inference on one signal per task, and
 the timing runs retrain every model alone, after a warm-up pass that keeps
 kernel compilation out of the clock, into `logs/timing/<task>/`. The report
 takes its times from there wherever such a run exists (all 24 images and 5
-shapes; for NeRF the scenes below) and its accuracy from the sweeps.
+shapes; for NeRF the scenes below; for super-resolution the two example
+images) and its accuracy from the sweeps.
 
 ```bash
 common="--clusters=accelgor --exclusive --gpus-per-node=1 --chdir=$VSC_DATA/projects/neurofield --output=logs/slurm/%x-%j.out"
@@ -112,6 +119,12 @@ for scene in lego hotdog; do
   sbatch $common --time=1:30:00 --job-name=nf-timing-nerf-$scene-b --wrap \
     "source $VSC_DATA/venvs/neurofield-env/bin/activate \
      && python scripts/train_nerf.py --data data/nerf/blender/$scene --models $B --overwrite --log-dir logs/timing/nerf"
+done
+# Super-resolution: the two example images, one exclusive job each.
+for image in 0882 0801; do
+  sbatch $common --time=2:00:00 --job-name=nf-timing-sr-$image --wrap \
+    "source $VSC_DATA/venvs/neurofield-env/bin/activate \
+     && python scripts/train_super_resolution.py --data data/DIV2K/DIV2K_valid_HR/$image.png --overwrite --log-dir logs/timing/super_resolution"
 done
 ```
 

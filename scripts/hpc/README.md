@@ -69,7 +69,9 @@ minutes and does the following:
 4. **Data.** Downloads the benchmark data into `data/`:
    - the 24 Kodak images to `data/Kodak/` (about 30 MB);
    - the 5 Stanford meshes to `data/occupancy/` (about 3 GB);
-   - the 8 Blender scenes to `data/nerf/blender/` (about 2.4 GB).
+   - the 8 Blender scenes to `data/nerf/blender/` (about 2.4 GB);
+   - the 100 DIV2K validation images and their 4x downsamplings to
+     `data/DIV2K/` (about 450 MB).
 
 The script is safe to rerun: existing files are kept. Rerun it after changing
 dependencies in `pyproject.toml`. The venv takes about 7 GB of the 25 GB
@@ -102,6 +104,9 @@ and submits itself with `sbatch`. The job then trains the models and records
 the commit in its output, e.g. `commit: 1a2b3c4`. Jobs are named
 `nf-<task>[-<signal>][-<model>]`, naming whatever the job runs only one of, so
 `squeue` and the log files say what is running. Pass `--job-name=` to override.
+A job array runs one signal per task: pass `--array=801-900`, and every `%a` in
+the arguments becomes the task id, zero-padded to four digits, as the
+super-resolution sweep does with `--data data/DIV2K/DIV2K_valid_HR/%a.png`.
 It also prints the scheduler's estimated start time, e.g.
 
 ```

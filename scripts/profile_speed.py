@@ -92,12 +92,34 @@ def nerf_inference(run: dict, path: Path, device) -> tuple[Callable, int]:
     return render, batch["rays_o"][..., 0].numel()
 
 
+def super_resolution_inference(run: dict, path: Path, device) -> tuple[Callable, int]:
+    """Render the high-resolution image, as the benchmark scores it.
+
+    Deep Image Prior renders it from its fixed noise; the interpolations are
+    not timed here, their own evaluation already times PIL alone.
+    """
+    if run["setup"].get("class") != "DIPSkip":
+        return image_inference(run, path, device)
+    model, noise = report.load_dip(run, path, device)
+    noise = noise.to(device)
+    return (
+        lambda: nf.chunked_inference(model, noise, device=device),
+        noise[0, 0].numel(),
+    )
+
+
 INFERENCE = {
     "image": image_inference,
     "occupancy": occupancy_inference,
     "nerf": nerf_inference,
+    "super_resolution": super_resolution_inference,
 }
-UNITS = {"image": "pixels", "occupancy": "voxels", "nerf": "rays"}
+UNITS = {
+    "image": "pixels",
+    "occupancy": "voxels",
+    "nerf": "rays",
+    "super_resolution": "pixels",
+}
 
 
 def main() -> None:
@@ -123,7 +145,7 @@ def main() -> None:
         runs = [
             run
             for run in report.read(args.log_dir / task, task)
-            if run["data"] == signal
+            if run["data"] == signal and "interpolation" not in run["setup"]
         ]
         print(f"\n{task} ({signal}), median of {args.repeats}")
         measured = {}

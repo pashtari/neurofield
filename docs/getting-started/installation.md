@@ -44,21 +44,23 @@ pip install -e ".[3d,nerf,dev]"
 
 ## Benchmark data
 
-The experiments use three public datasets. The scripts download them into `data/`, which is ignored by git:
+The experiments use three public datasets, and the super-resolution notebook a fourth. The scripts download them into `data/`, which is ignored by git:
 
 ```bash
 python scripts/download_kodak.py      # 24 Kodak images (768 x 512), about 30 MB
 python scripts/download_meshes.py     # 5 Stanford meshes, about 3 GB
 python scripts/download_blender.py    # 8 NeRF synthetic (Blender) scenes, about 2.4 GB
+python scripts/download_div2k.py      # 100 DIV2K validation images and their 4x downsamplings, about 450 MB
 ```
 
-Each script takes `--output-dir`, `--force`, and a subset selector (`--images 1 17 23`, `--meshes armadillo thai_statue`, `--scenes lego ship`). Interrupted downloads resume; existing files are kept. The resulting layout is what the training scripts and notebooks expect:
+Each script takes `--output-dir` and `--force`, and the first three a subset selector (`--images 1 17 23`, `--meshes armadillo thai_statue`, `--scenes lego ship`); DIV2K comes as two archives. Interrupted downloads resume; existing files are kept. The resulting layout is what the training scripts and notebooks expect:
 
 ```
 data/
 ├── Kodak/kodim01.png ... kodim24.png
 ├── occupancy/armadillo.ply  dragon.ply  happy_buddha.ply  lucy.ply  thai_statue.ply
-└── nerf/blender/<scene>/transforms_{train,val,test}.json + images
+├── nerf/blender/<scene>/transforms_{train,val,test}.json + images
+└── DIV2K/DIV2K_valid_HR/0801.png ... 0900.png  and  DIV2K_valid_LR_bicubic/X4/0801x4.png ... 0900x4.png
 ```
 
 Occupancy volumes are voxelized on first use and cached beside the mesh in `data/occupancy/.cache/<name>_<resolution>.pt`.

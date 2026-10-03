@@ -15,7 +15,7 @@ Thumbs.db
 .trash/
 .claude/
 .old_experiments/
-.todo_notebooks/
+.archived_notebooks/
 data/
 paper/
 poster/

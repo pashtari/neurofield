@@ -80,6 +80,7 @@ echo "==> Data: $ROOT/data (existing files are kept)"
 python scripts/download_kodak.py
 python scripts/download_meshes.py
 python scripts/download_blender.py --workers 4
+python scripts/download_div2k.py
 
 echo "==> Done. Test with:"
 echo "    scripts/hpc/train.sh --clusters=accelgor --time=0:15:00 image --data data/Kodak/kodim01.png --models SIREN"

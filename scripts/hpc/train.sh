@@ -6,11 +6,15 @@
 #SBATCH --output=logs/slurm/%x-%j.out
 #
 # Train the models of one benchmark task on one GPU of HPC-UGent.
-#     scripts/hpc/train.sh [sbatch options] <image|occupancy|nerf> [train_<task>.py options]
+#     scripts/hpc/train.sh [sbatch options] <image|occupancy|nerf|super_resolution> [train_<task>.py options]
 #     scripts/hpc/train.sh --clusters=accelgor image --models SIREN FINER
 # sbatch options come before the task and use the --name=value form. The
-# default hour covers one image, one shape, or one NeRF model; short jobs are
-# scheduled sooner, and finished runs are skipped when a job is resubmitted.
+# default hour covers one image, one shape, one NeRF model, or one
+# super-resolution image; short jobs are scheduled sooner, and finished runs
+# are skipped when a job is resubmitted. A job array runs one signal per task:
+# every %a in the arguments becomes the task id, zero-padded to four digits.
+#     scripts/hpc/train.sh --clusters=accelgor --array=801-900 super_resolution \
+#       --data data/DIV2K/DIV2K_valid_HR/%a.png
 #
 # The script runs in three places:
 #   local machine: pushes local commits, connects over SSH, and reruns itself
@@ -57,7 +61,7 @@ if [[ -z ${SLURM_JOB_ID:-} ]]; then
     shift
   done
   if [[ $# -eq 0 ]]; then
-    echo "usage: $0 [sbatch options] <image|occupancy|nerf> [options]" >&2
+    echo "usage: $0 [sbatch options] <image|occupancy|nerf|super_resolution> [options]" >&2
     exit 2
   fi
   # Name the job nf-<task>[-<signal>][-<model>], naming only what is unique,
@@ -74,7 +78,7 @@ if [[ -z ${SLURM_JOB_ID:-} ]]; then
         *) [[ -n $collect ]] && values+=("$arg") ;;
       esac
     done
-    if [[ ${#values[@]} -eq 1 ]]; then
+    if [[ ${#values[@]} -eq 1 && ${values[0]} != *%a* ]]; then
       value=${values[0]%/}  # NeRF scenes are directories
       value=${value##*/}
       name+=-${value%.*}
@@ -110,8 +114,11 @@ if [[ -z ${SLURM_JOB_ID:-} ]]; then
   exit 0
 fi
 
-task=${1:?usage: sbatch scripts/hpc/train.sh <image|occupancy|nerf> [options]}
+task=${1:?usage: sbatch scripts/hpc/train.sh <image|occupancy|nerf|super_resolution> [options]}
 shift
+if [[ -n ${SLURM_ARRAY_TASK_ID:-} ]]; then
+  set -- "${@//%a/$(printf %04d "$SLURM_ARRAY_TASK_ID")}"
+fi
 
 # Modules loaded on the login node would shadow the venv's libraries.
 module --force purge >/dev/null 2>&1 || true

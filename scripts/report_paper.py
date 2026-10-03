@@ -54,6 +54,7 @@ import seaborn as sns
 import torch
 import yaml
 from matplotlib.axis import Axis
+from torch import Tensor
 from matplotlib.backends.backend_pgf import LatexError
 from matplotlib.lines import Line2D
 from matplotlib.font_manager import FontProperties
@@ -68,6 +69,7 @@ from matplotlib.ticker import (
 )
 from PIL import Image
 from train_common import ROOT, build, merge
+from train_super_resolution import INTERPOLATIONS, low_resolution
 
 import neurofield as nf
 
@@ -79,22 +81,30 @@ METRICS = {
     "lpips": ("LPIPS", False, 1, 4),
     "iou": ("IoU (%)", True, 100, 2),
 }
-SPEED = {"image": "img/s", "occupancy": "vol/s", "nerf": "views/s"}
+SPEED = {
+    "image": "img/s",
+    "occupancy": "vol/s",
+    "nerf": "views/s",
+    "super_resolution": "img/s",
+}
 SIGNALS = {  # where a task's signal lives
     "image": "data/Kodak/{}.png",
     "occupancy": "data/occupancy/{}.ply",
     "nerf": "data/nerf/blender/{}",
+    "super_resolution": "data/DIV2K/DIV2K_valid_HR/{}.png",
 }
 # Per task, the metric plotted, its axis label, and the metrics tabulated.
 TASKS = {
     "image": ("psnr", "PSNR (dB)", ("psnr", "ssim", "lpips")),
     "occupancy": ("iou", "IoU (%)", ("iou",)),
     "nerf": ("psnr", "PSNR (dB)", ("psnr", "ssim", "lpips")),
+    "super_resolution": ("psnr", "PSNR (dB)", ("psnr", "ssim", "lpips")),
 }
 EXAMPLES = {  # the two signals each task shows, the ones FUTON gains most on
     "image": ("kodim01", "kodim17", "kodim19", "kodim21"),
     "occupancy": ("thai_statue", "armadillo"),
     "nerf": ("lego", "hotdog", "materials"),
+    "super_resolution": ("0882",),
 }
 # The test view a scene is rendered from, the one where FUTON gains most of
 # those that show the scene whole: every run records all 200, so the choice is
@@ -142,8 +152,17 @@ FEATURED = {
 OTHERS = "0.7"  # gray of every other model
 # TensoRF is its default variant for the dimension: CP in 2D, where it is the
 # only one, and VM in 3D, the one its authors recommend.
-TENSORF = {"image": "TensoRF", "occupancy": "TensoRF-VM", "nerf": "TensoRF-VM"}
+TENSORF = {
+    "image": "TensoRF",
+    "occupancy": "TensoRF-VM",
+    "nerf": "TensoRF-VM",
+    "super_resolution": "TensoRF",
+}
+# Super-resolution alone has untrained baselines: interpolations, drawn as the
+# dotted level of the standard one rather than as points, and Deep Image Prior.
+REFERENCE = "Bicubic"
 ROWS = (
+    "Nearest", "Bilinear", "Bicubic", "DIP",
     "RFF", "PE-MLP", "MFN", "SIREN", "Gauss", "WIRE", "FINER", "Instant-NGP",
     "TensoRF", "GA-Planes", "FUTON-sinc", "FUTON-lanczos",
 )  # fmt: skip
@@ -162,7 +181,7 @@ COLORS = ("#e02020", "#00a2c7")
 # mean, which sizes it alike whatever the aspect ratio. The regions themselves
 # are found, not set: see :func:`regions`. A NeRF view is 200 pixels across, so
 # its regions hold fewer of them and stay wider.
-SIDES = {"image": 0.075, "occupancy": 0.14, "nerf": 0.20}
+SIDES = {"image": 0.075, "occupancy": 0.14, "nerf": 0.20, "super_resolution": 0.075}
 # The magnifications' titles and scores: the largest size they are set at, and
 # the inches kept above the panels for the titles and below for the scores. A
 # talk raises both before drawing; the paper keeps them.
@@ -501,6 +520,7 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
     Time is logarithmic, since the curves span more than a decade of it.
     """
     metric, label, _ = TASKS[task]
+    reference = curve[curve["model"] == REFERENCE][metric].mean()
     curve = curve[curve["model"].isin(FEATURED)]
     curve = curve.assign(
         time=curve.groupby(["model", "iteration"])["time"].transform("mean"),
@@ -530,6 +550,8 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
     shown = means[means[metric].between(low, high)]["time"]
     # The marker the legend carries, at the end of each curve.
     for model, (color, _, filled) in FEATURED.items():
+        if model not in means["model"].values:  # a sweep still running
+            continue
         last = means[means["model"] == model].iloc[-1]
         plot.plot(last["time"], last[metric], marker="o", markersize=4,
                   color=color, markerfacecolor=color if filled else "white",
@@ -542,6 +564,8 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
         ylabel=label,
     )
     log_ticks(plot.xaxis)
+    if not math.isnan(reference):
+        plot.axhline(reference, color="0.4", linestyle=":", linewidth=0.8, zorder=1)
     return figure
 
 
@@ -559,10 +583,17 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
         "speed": rf"Inference ({SPEED[task]})$\,\uparrow$",
     }[cost]
     means = final.groupby("model")[[cost, metric]].mean()
-    others = means[~means.index.isin(FEATURED)]
+    # The interpolations take no training: they set the reference level, not a point.
+    trained = means[final.groupby("model")["time"].mean() > 0]
+    others = trained[~trained.index.isin(FEATURED)]
     figure, plot = plt.subplots(figsize=SIZE)
+    if REFERENCE in means.index:
+        level = means.loc[REFERENCE, metric]
+        plot.axhline(level, color="0.4", linestyle=":", linewidth=0.8, zorder=1)
     plot.scatter(others[cost], others[metric], s=14, color=OTHERS, zorder=2)
     for model, (color, _, filled) in FEATURED.items():
+        if model not in means.index:  # a sweep still running
+            continue
         x, y = means.loc[model, [cost, metric]]
         plot.scatter(
             x,
@@ -575,8 +606,8 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
     # Explicit limits, so that the pair of figures shares a quality axis and
     # no marker touches a spine.
     plot.set(
-        xlim=padded(means[cost]),
-        ylim=padded(means[metric]),
+        xlim=padded(trained[cost]),
+        ylim=padded(trained[metric]),
         xlabel=axis,
         ylabel=label,
     )
@@ -726,7 +757,7 @@ def tables(final: pd.DataFrame, task: str) -> dict[str, str]:
     spec = {"parameters": PARAMS, "time": ("", "Train time (s)", False, 1)}
     values = final.groupby("model")[list(spec)].mean()
     errors = paired_error(final, metrics)
-    if task == "image":  # 24 images, so their mean alone
+    if task in ("image", "super_resolution"):  # many images, so their mean alone
         for metric in metrics:
             name, larger_is_better, _, decimals = METRICS[metric]
             spec[metric] = ("", name, larger_is_better, decimals)
@@ -877,7 +908,54 @@ def render_orbit(
         )
 
 
-RENDER = {"image": render_image, "occupancy": render_occupancy, "nerf": render_nerf}
+def load_dip(run: dict[str, Any], path: Path, device) -> tuple[torch.nn.Module, Tensor]:
+    """Rebuild a DIP run's network and the fixed noise it renders the image from."""
+    model_class, kwargs = build(run["setup"])
+    dataset = nf.DIPImageDataset(
+        path, noise_channels=kwargs["in_channels"], reg_noise_std=0
+    )
+    model = model_class(**kwargs)
+    state = torch.load(run["directory"] / "checkpoint.pt", map_location="cpu")
+    model.load_state_dict(state)
+    return model.to(device), dataset.input[None]
+
+
+def render_super_resolution(
+    signal: str, runs: list[dict], directory: Path, device
+) -> None:
+    """The high-resolution image, and each model's recovery of it from the low one."""
+    path = ROOT / SIGNALS["super_resolution"].format(signal)
+    dataset = nf.ImageCoordinateDataset(path)
+    dataset.save(dataset.original, directory / "truth")
+    scale = model_config(runs[0])["data"]["scale"]
+    for run in runs:
+        setup = run["setup"]
+        if "interpolation" in setup:
+            with Image.open(low_resolution(path, scale)) as image:
+                size = (dataset.original.shape[2], dataset.original.shape[1])
+                upsampled = image.convert("RGB").resize(
+                    size, INTERPOLATIONS[setup["interpolation"]]
+                )
+            output = torch.from_numpy(np.asarray(upsampled)).permute(2, 0, 1)
+        elif setup["class"] == "DIPSkip":
+            model, noise = load_dip(run, path, device)
+            rendered = nf.chunked_inference(model, noise, device=device)[0]
+            output = nf.DIPImageDataset.postprocess(rendered.cpu())
+        else:
+            model = load_model(run, 2, 3, device)
+            rendered = nf.chunked_inference(
+                model, dataset.input, chunk_size=2**18, device=device
+            )
+            output = dataset.postprocess(rendered.cpu())
+        dataset.save(output, directory / run["model"])
+
+
+RENDER = {
+    "image": render_image,
+    "occupancy": render_occupancy,
+    "nerf": render_nerf,
+    "super_resolution": render_super_resolution,
+}
 
 
 def panels(
@@ -1359,12 +1437,18 @@ def main() -> None:
     out_dir = ROOT / "results"
     save(legend(), out_dir / "legend")
     for task in args.tasks:
+        if not (ROOT / "logs" / task).exists():
+            print(f"{task}: no runs under logs/{task}, skipped")
+            continue
         runs, final, curve = load(task)
+        for suffix, text in tables(final, task).items():
+            (out_dir / task / f"table.{suffix}").write_text(text)
+        if not final["model"].isin(FEATURED).any():  # a sweep still running
+            print(f"{task}: no featured model has finished, so no figures yet")
+            continue
         save(convergence(curve, task), out_dir / task / "convergence")
         save(tradeoff(final, task), out_dir / task / "tradeoff")
         save(tradeoff(final, task, "speed"), out_dir / task / "throughput")
-        for suffix, text in tables(final, task).items():
-            (out_dir / task / f"table.{suffix}").write_text(text)
         for signal in [] if args.no_panels else args.signals or EXAMPLES[task]:
             directory = panels(task, signal, runs, args.device, args.overwrite)
             if args.orbit and task == "nerf":

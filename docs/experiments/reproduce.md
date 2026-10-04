@@ -89,7 +89,7 @@ results/
 ├── <task>/tradeoff.{pdf,pgf}        every model's final quality against its training time
 ├── <task>/throughput.{pdf,pgf}      the same against its inference rate
 ├── <task>/table.{tex,md}            size, training time and final metrics, best in bold, second underlined
-├── <task>/qualitative_<signal>.pdf  the signal with two regions boxed and magnified for every featured model
+├── <task>/qualitative_<signal>.pdf  the signal with two regions boxed and magnified for every featured model (bicubic for TensoRF in super-resolution)
 ├── <task>/panels/<signal>/          the renders those magnifications are cut from, rebuilt from the checkpoints
 └── ablation/                        a table and a convergence plot each for the bases, the combiners and the decoders, and PSNR against each fraction
 ```

@@ -143,12 +143,13 @@ The 100 DIV2K validation images, observed at a quarter of their size. Each image
 
 <figure markdown="span">
   ![DIV2K: convergence, training-time trade-off and throughput](../assets/results_super_resolution.svg){ width="960" }
-  <figcaption>PSNR against training time for FUTON and the strongest model of each family, with bicubic interpolation as the dotted level; every model's final PSNR against its training time; and against its inference rate, in images per second.</figcaption>
+  <figcaption>PSNR against training time for FUTON and the strongest model of each family, with bicubic interpolation as the dotted level; every model's final PSNR against its training time, PE-MLP at 22.6 dB as a marker on the axis line; and against its inference rate, in images per second.</figcaption>
 </figure>
 
 <figure markdown="span">
   ![0882](../assets/qualitative_0882.png)
-  <figcaption>DIV2K 0882: two regions magnified for the original and every featured model, with each model's PSNR over the whole image; bicubic interpolation reaches 32.83 dB on it.</figcaption>
+  ![0896](../assets/qualitative_0896.png)
+  <figcaption>DIV2K 0882 and 0896: the butterfly's head and a hindwing, and two wing tips of the geese, magnified for the original, bicubic interpolation and the featured fields, with each model's PSNR over the whole image. Bicubic stands in for TensoRF here, the weakest featured model on this task, so that the reference every model is measured against is in view.</figcaption>
 </figure>
 
 Super-resolution is the hardest task here for every model: nothing but the low-resolution image is seen, so the margins are fractions of a decibel and several fields lose to bicubic interpolation. FUTON-sinc beats bicubic on 99 of the 100 images, by 0.72 dB on average and 1.8 dB on 0882, and leads PSNR and SSIM; SIREN (ahead of bicubic on 90 images) and FUTON-lanczos (on 94, in 48 s, the fastest trained model) follow within 0.2 dB. Instant-NGP, FINER and GA-Planes gain 0.15 to 0.3 dB on average but lose to bicubic on more than a third of the images; the deep image prior and TensoRF do not beat it. Bicubic keeps the best LPIPS, by 0.015 over FUTON-sinc, which suggests the fields buy their PSNR at edges rather than in texture, the one thing a single low-resolution image cannot teach. PE-MLP is unstable under the L1 loss: the learning rate chosen on the tuning images still fails on 14 of the 100, which end below 20 dB and drag its mean to 22.6 dB.

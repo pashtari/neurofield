@@ -18,7 +18,8 @@ Writes results/, which holds the paper's figures and tables and nothing else:
                                      NeRF every scene's metrics under a super column
     <task>/qualitative_<signal>.pdf  the signal with two regions boxed, and those
                                      regions magnified for the ground truth and
-                                     every featured model
+                                     every featured model (for super-resolution,
+                                     bicubic interpolation in place of TensoRF)
     <task>/panels/<signal>/          the renders those magnifications are cut from,
                                      rebuilt from the checkpoints and kept, so that
                                      recomposing a figure needs no GPU
@@ -69,6 +70,7 @@ from matplotlib.patches import Rectangle
 from matplotlib.ticker import (
     FixedLocator,
     MaxNLocator,
+    MultipleLocator,
     NullFormatter,
     NullLocator,
     StrMethodFormatter,
@@ -110,7 +112,7 @@ EXAMPLES = {  # the two signals each task shows, the ones FUTON gains most on
     "image": ("kodim01", "kodim17", "kodim19", "kodim21"),
     "occupancy": ("thai_statue", "armadillo"),
     "nerf": ("lego", "hotdog", "materials"),
-    "super_resolution": ("0882",),
+    "super_resolution": ("0882", "0896"),
 }
 # The test view a scene is rendered from, the one where FUTON gains most of
 # those that show the scene whole: every run records all 200, so the choice is
@@ -135,6 +137,7 @@ CENTERS: dict[str, tuple[tuple[float, float], ...]] = {
     "lego": ((0.356, 0.260), (0.383, 0.678)),
     "hotdog": ((0.475, 0.210), (0.796, 0.333)),
     "materials": ((0.407, 0.639), (0.667, 0.741)),
+    "0882": ((0.50, 0.335), (0.60, 0.665)),  # the butterfly's head, a hindwing
 }
 UP = {"lucy": 2}  # the Stanford Lucy is z up; the other four shapes are y up
 
@@ -156,6 +159,19 @@ FEATURED = {
     "FUTON-lanczos": (PALETTE[0], (4, 2), False),
 }
 OTHERS = "0.7"  # gray of every other model
+# The models a task's qualitative strip magnifies, where they differ from the
+# featured ones: super-resolution shows the bicubic reference, which every
+# model is measured against, in place of TensoRF, the weakest of them there.
+STRIP = {
+    "super_resolution": (
+        "Bicubic",
+        "SIREN",
+        "FINER",
+        "Instant-NGP",
+        "FUTON-sinc",
+        "FUTON-lanczos",
+    ),
+}
 # TensoRF is its default variant for the dimension: CP in 2D, where it is the
 # only one, and VM in 3D, the one its authors recommend.
 TENSORF = {
@@ -175,6 +191,9 @@ ROWS = (
 # Metric axes are linear, which needs no explaining; IoU saturates, so its
 # curves start here instead, which the ticks show plainly.
 FLOOR = {"occupancy": 99.0}
+# Where a task's quality axis starts, whatever the models reach: a model below
+# it is drawn as a marker on the axis line.
+BOTTOM = {"super_resolution": 26.0}
 TARGET = 99.8  # IoU (%) whose first time the text quotes
 SIZE = (2.3, 1.9)  # inches, a third of a two-column page with gutters
 WIDTH = 7.0  # inches, a two-column figure
@@ -187,7 +206,7 @@ COLORS = ("#e02020", "#00a2c7")
 # mean, which sizes it alike whatever the aspect ratio. The regions themselves
 # are found, not set: see :func:`regions`. A NeRF view is 200 pixels across, so
 # its regions hold fewer of them and stay wider.
-SIDES = {"image": 0.075, "occupancy": 0.14, "nerf": 0.20, "super_resolution": 0.075}
+SIDES = {"image": 0.075, "occupancy": 0.14, "nerf": 0.20, "super_resolution": 0.1}
 # The magnifications' titles and scores: the largest size they are set at, and
 # the inches kept above the panels for the titles and below for the scores. A
 # talk raises both before drawing; the paper keeps them.
@@ -525,16 +544,20 @@ def log_ticks(axis: Axis) -> None:
 
 
 def quality_ticks(plot: plt.Axes, metric: str, low: float, high: float) -> None:
-    """Set the quality axis: whole decibels for PSNR, tenths for IoU.
+    """Set the quality axis: whole decibels for PSNR, half points for IoU.
 
     A PSNR tick with decimals reads as a precision the plots do not have, so
-    the limits widen to whole numbers and the ticks fall on them; IoU keeps
-    its tenths, on which the models separate.
+    the limits widen to whole numbers and the ticks fall on them; IoU, on
+    which the models separate within a point, keeps halves.
     """
     if metric == "psnr":
         low, high = math.floor(low), math.ceil(high)
+        plot.yaxis.set_major_locator(MaxNLocator(5, integer=True))
+    else:  # IoU, which cannot pass 100
+        low, high = math.floor(2 * low) / 2, min(math.ceil(2 * high) / 2, 100.0)
+        plot.yaxis.set_major_locator(MultipleLocator(0.5))
+        plot.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     plot.set_ylim(low, high)
-    plot.yaxis.set_major_locator(MaxNLocator(5, integer=metric == "psnr"))
 
 
 def padded(values: pd.Series, fraction: float = 0.08) -> tuple[float, float]:
@@ -588,7 +611,7 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
         [metric, "time"]
     ].mean()
     low, high = y_range(means, metric)
-    low = max(low, FLOOR.get(task, low))
+    low = BOTTOM.get(task, max(low, FLOOR.get(task, low)))
     if metric == "psnr":
         low, high = math.floor(low), math.ceil(high)
     shown = means[means[metric].between(low, high)]["time"]
@@ -651,7 +674,13 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
     # no marker touches a spine.
     plot.set(xlim=padded(trained[cost]), xlabel=axis, ylabel=label)
     plot.xaxis.set_major_locator(MaxNLocator(5))
-    quality_ticks(plot, metric, *padded(trained[metric]))
+    low, high = padded(trained[metric])
+    if task in BOTTOM:
+        low = BOTTOM[task]
+        under = others[others[metric] < low]
+        plot.scatter(under[cost], [low] * len(under), s=14, marker="v",
+                     color=OTHERS, clip_on=False, zorder=2)  # fmt: skip
+    quality_ticks(plot, metric, low, high)
     return figure
 
 
@@ -1003,7 +1032,7 @@ RENDER = {
 def panels(
     task: str, signal: str, runs: list[dict], device: str, overwrite: bool
 ) -> Path:
-    """The signal and every featured model's reconstruction of it, as PNGs.
+    """The signal and every strip model's reconstruction of it, as PNGs.
 
     Rendering rebuilds each model from its checkpoint, which needs the signal
     in data/ and a GPU, so the panels are kept and reused.
@@ -1011,7 +1040,7 @@ def panels(
     directory = ROOT / "results" / task / "panels" / signal
     missing = {
         model
-        for model in FEATURED
+        for model in STRIP.get(task, tuple(FEATURED))
         if overwrite or not (directory / f"{model}.png").exists()
     }
     if not missing and (directory / "truth.png").exists():
@@ -1142,10 +1171,11 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
     makes it so that no panel is padded with white.
     """
     metric, _, _ = TASKS[task]
+    models = STRIP.get(task, tuple(FEATURED))
     scores = final[final["signal"] == signal].set_index("model")[metric]
     panel = {
         name: plt.imread(directory / f"{name}.png")[..., :3]
-        for name in ["truth", *FEATURED]
+        for name in ["truth", *models]
     }
     box = trim(panel["truth"])
     panel = {name: image[box] for name, image in panel.items()}
@@ -1169,7 +1199,7 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
     )
     print(f'    "{signal}": ({centres}),  # centres, for CENTERS', flush=True)
 
-    rows, columns = len(found), len(FEATURED) + 1
+    rows, columns = len(found), len(models) + 1
     # Laid out in inches rather than by a gridspec, so that the reference
     # spans the rows exactly, its top and bottom edges on theirs, whatever its
     # aspect ratio. A magnification is square; the reference is as wide as its
@@ -1201,9 +1231,9 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
             Rectangle((left, top), side, side, fill=False, color=color, linewidth=0.9)
         )
 
-    winner = scores[list(FEATURED)].idxmax()  # both plotted metrics are larger-better
+    winner = scores[list(models)].idxmax()  # both plotted metrics are larger-better
     shown = [("Ground truth", "truth", "")] + [
-        (model, model, UNITS[metric].format(scores[model])) for model in FEATURED
+        (model, model, UNITS[metric].format(scores[model])) for model in models
     ]
     # Titles and scores each as large as their columns allow: the widest pair
     # of neighbours keeps 8% of the column spacing between them, measured in

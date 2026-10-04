@@ -1,10 +1,10 @@
 # Benchmarks
 
-Twelve models on three tasks, at equal parameter count per task. The tables are `results/<task>/table.md` as `scripts/report_paper.py` writes them from the runs in `logs/`; the figures are the paper's. Bold marks the best value in a column and italics the second; ± is one standard error over the signals, after removing each signal's own level (a paired standard error).
+Twelve models on four tasks, at equal parameter count per task; the fourth, super-resolution, adds the deep image prior and three interpolations as references. The tables are `results/<task>/table.md` as `scripts/report_paper.py` writes them from the runs in `logs/`; the figures are the paper's. Bold marks the best value in a column and italics the second; ± is one standard error over the signals, after removing each signal's own level (a paired standard error).
 
 Two notes on the rows. **TensoRF** is the variant its authors recommend for the dimension: CP on images (the only one in 2D) and VM on volumes and radiance fields; both are in the configs. **WIRE** is the real Gabor variant (`nf.RealWIRE`) from the WIRE paper and code.
 
-Accuracy comes from the benchmark sweeps. Times are measured separately: for images and volumes every model was retrained alone on an exclusive A100 node after a warm-up pass, and the inference rates in the throughput panels come from the same kind of job (`scripts/profile_speed.py`). The radiance-field training times still come from the sweep's jobs, which shared their nodes and inflate launch-bound models (Instant-NGP trained about 1.6× slower beside neighbours on the other tasks); an exclusive rerun of the lego and hotdog scenes is queued.
+Accuracy comes from the benchmark sweeps. Times are measured separately: every model was retrained alone on an exclusive A100 node after a warm-up pass, on all 24 images and 5 shapes, on the lego and hotdog scenes and on DIV2K images 0801 and 0882, and the tables and figures take their training times from those runs, so a radiance-field or super-resolution time is the mean over its two timed signals. The inference rates in the throughput panels come from the same kind of job (`scripts/profile_speed.py`). The sweeps' own times were within 6 % of the exclusive ones on radiance fields and within 12 % on super-resolution; the image and volume sweeps ran on a busier cluster, where Instant-NGP came out 1.7× slower beside its neighbours.
 
 ## Images
 
@@ -71,18 +71,18 @@ Eight NeRF synthetic (Blender) scenes under FINER's protocol: 200 × 200 views, 
 
 | Model | Params (k) | Train time (s) ↓ | PSNR (dB) ↑ | SSIM (%) ↑ | LPIPS ↓ |
 | --- | --- | --- | --- | --- | --- |
-| RFF | 74.5 | *317.1* | 24.95 ± 0.61 | 86.94 ± 1.70 | 0.2168 ± 0.0174 |
-| PE-MLP | 86.0 | 422.8 | 28.41 ± 0.13 | 93.53 ± 0.24 | 0.0720 ± 0.0044 |
-| MFN | 75.8 | 694.1 | 28.38 ± 0.16 | 93.30 ± 0.20 | 0.0743 ± 0.0034 |
-| SIREN | 75.2 | 398.7 | 28.84 ± 0.12 | 93.71 ± 0.19 | 0.0976 ± 0.0093 |
-| Gauss | 75.2 | 540.0 | 27.63 ± 0.13 | 92.35 ± 0.16 | 0.1050 ± 0.0069 |
-| WIRE | 74.5 | 557.4 | 28.45 ± 0.14 | 93.11 ± 0.12 | 0.1127 ± 0.0042 |
-| FINER | 75.2 | 444.7 | 28.85 ± 0.15 | 93.59 ± 0.22 | 0.1157 ± 0.0127 |
-| Instant-NGP | 75.0 | 789.6 | 26.94 ± 0.16 | 91.74 ± 0.35 | 0.1001 ± 0.0061 |
-| TensoRF | 74.8 | 480.6 | 27.76 ± 0.24 | 93.13 ± 0.31 | 0.0750 ± 0.0053 |
-| GA-Planes | 75.0 | 512.5 | 28.04 ± 0.27 | 93.58 ± 0.43 | 0.0698 ± 0.0050 |
-| FUTON-sinc | 74.1 | 342.8 | **28.95** ± 0.29 | **94.31** ± 0.44 | **0.0660** ± 0.0061 |
-| FUTON-lanczos | 74.1 | **314.9** | *28.93* ± 0.28 | *94.26* ± 0.46 | *0.0662* ± 0.0060 |
+| RFF | 74.5 | *346.3* | 24.95 ± 0.61 | 86.94 ± 1.70 | 0.2168 ± 0.0174 |
+| PE-MLP | 86.0 | 400.1 | 28.41 ± 0.13 | 93.53 ± 0.24 | 0.0720 ± 0.0044 |
+| MFN | 75.8 | 784.5 | 28.38 ± 0.16 | 93.30 ± 0.20 | 0.0743 ± 0.0034 |
+| SIREN | 75.2 | 441.6 | 28.84 ± 0.12 | 93.71 ± 0.19 | 0.0976 ± 0.0093 |
+| Gauss | 75.2 | 560.2 | 27.63 ± 0.13 | 92.35 ± 0.16 | 0.1050 ± 0.0069 |
+| WIRE | 74.5 | 604.3 | 28.45 ± 0.14 | 93.11 ± 0.12 | 0.1127 ± 0.0042 |
+| FINER | 75.2 | 501.9 | 28.85 ± 0.15 | 93.59 ± 0.22 | 0.1157 ± 0.0127 |
+| Instant-NGP | 75.0 | 812.9 | 26.94 ± 0.16 | 91.74 ± 0.35 | 0.1001 ± 0.0061 |
+| TensoRF | 74.8 | 532.0 | 27.76 ± 0.24 | 93.13 ± 0.31 | 0.0750 ± 0.0053 |
+| GA-Planes | 75.0 | 578.0 | 28.04 ± 0.27 | 93.58 ± 0.43 | 0.0698 ± 0.0050 |
+| FUTON-sinc | 74.1 | 359.5 | **28.95** ± 0.29 | **94.31** ± 0.44 | **0.0660** ± 0.0061 |
+| FUTON-lanczos | 74.1 | **327.0** | *28.93* ± 0.28 | *94.26* ± 0.46 | *0.0662* ± 0.0060 |
 
 Per scene, the picture is mixed, which the mean hides: FUTON leads on lego, materials, hotdog and ship, and trails FINER and SIREN on chair, drums, ficus and mic.
 
@@ -118,10 +118,45 @@ Test-view PSNR in dB. `results/nerf/table.md` also lists SSIM and LPIPS per scen
   <figcaption>The same scene in orbit: SIREN, Instant-NGP and FUTON-sinc, with their test-view PSNR.</figcaption>
 </figure>
 
+## Super-resolution
+
+The 100 DIV2K validation images, observed at a quarter of their size. Each image, about 2040 × 1356 pixels, is downsampled 4× with the antialiased bicubic filter of MATLAB's `imresize`, the standard protocol, and the models see nothing but the result, about 510 × 339 pixels. A field maps the high-resolution coordinates to RGB and is trained through the downsampling operator: a step draws 5 % of the low-resolution pixels in 8 × 8 blocks, evaluates the field at the high-resolution pixels beneath them (about 260k evaluations), downsamples the result with the same filter and takes the L1 distance to the observed pixels, for 2000 steps at about 500k parameters per model. The deep image prior (DIP) trains its convolutional generator through the same operator and joins nearest, bilinear and bicubic interpolation as a reference row. FUTON's grid of components is the low-resolution size, K = (H/4, W/4), and its rank the largest within the budget on each image (399 on 0882), since the grid follows the image's size where the baselines' widths do not. Every model's scale and learning rate were chosen on three DIV2K training images (0395, 0431 and 0777) by the mean gain over bicubic, with the L1 loss throughout. PSNR and SSIM are computed on the luma channel after shaving a 4-pixel border, LPIPS on RGB, all against the original image.
+
+| Model | Params (k) | Train time (s) ↓ | PSNR (dB) ↑ | SSIM (%) ↑ | LPIPS ↓ |
+| --- | --- | --- | --- | --- | --- |
+| Nearest | – | – | 26.73 ± 0.08 | 73.35 ± 0.13 | 0.4588 ± 0.0047 |
+| Bilinear | – | – | 27.53 ± 0.04 | 75.71 ± 0.15 | 0.3679 ± 0.0024 |
+| Bicubic | – | – | 28.10 ± 0.04 | 77.49 ± 0.16 | **0.3526** ± 0.0026 |
+| DIP | 505.3 | 268.5 | 28.07 ± 0.05 | 75.77 ± 0.19 | 0.4173 ± 0.0044 |
+| RFF | 500.0 | 105.0 | 27.15 ± 0.09 | 73.50 ± 0.22 | 0.4463 ± 0.0028 |
+| PE-MLP | 502.1 | 119.8 | 22.61 ± 0.21 | 61.35 ± 0.57 | 0.5801 ± 0.0045 |
+| MFN | 501.8 | 222.9 | 27.61 ± 0.10 | 75.04 ± 0.20 | 0.4280 ± 0.0022 |
+| SIREN | 500.6 | 130.7 | *28.69* ± 0.07 | *77.90* ± 0.11 | 0.3759 ± 0.0022 |
+| Gauss | 500.6 | 152.0 | 26.23 ± 0.10 | 61.67 ± 0.53 | 0.5199 ± 0.0067 |
+| WIRE | 502.0 | 171.8 | 26.23 ± 0.07 | 70.90 ± 0.23 | 0.4900 ± 0.0023 |
+| FINER | 500.6 | 145.9 | 28.37 ± 0.06 | 75.07 ± 0.16 | 0.3991 ± 0.0031 |
+| Instant-NGP | 505.2 | *68.2* | 28.39 ± 0.06 | 77.01 ± 0.10 | 0.3783 ± 0.0021 |
+| TensoRF | 500.4 | 80.7 | 27.99 ± 0.04 | 76.31 ± 0.12 | 0.4020 ± 0.0025 |
+| GA-Planes | 501.3 | 68.8 | 28.26 ± 0.05 | 76.74 ± 0.09 | 0.3927 ± 0.0020 |
+| FUTON-sinc | 499.3 | 92.8 | **28.83** ± 0.07 | **78.96** ± 0.18 | *0.3672* ± 0.0020 |
+| FUTON-lanczos | 499.3 | **48.2** | 28.65 ± 0.06 | *77.90* ± 0.17 | 0.3856 ± 0.0022 |
+
+<figure markdown="span">
+  ![DIV2K: convergence, training-time trade-off and throughput](../assets/results_super_resolution.svg){ width="960" }
+  <figcaption>PSNR against training time for FUTON and the strongest model of each family, with bicubic interpolation as the dotted level; every model's final PSNR against its training time; and against its inference rate, in images per second.</figcaption>
+</figure>
+
+<figure markdown="span">
+  ![0882](../assets/qualitative_0882.png)
+  <figcaption>DIV2K 0882: two regions magnified for the original and every featured model, with each model's PSNR over the whole image; bicubic interpolation reaches 32.83 dB on it.</figcaption>
+</figure>
+
+Super-resolution is the hardest task here for every model: nothing but the low-resolution image is seen, so the margins are fractions of a decibel and several fields lose to bicubic interpolation. FUTON-sinc beats bicubic on 99 of the 100 images, by 0.72 dB on average and 1.8 dB on 0882, and leads PSNR and SSIM; SIREN (ahead of bicubic on 90 images) and FUTON-lanczos (on 94, in 48 s, the fastest trained model) follow within 0.2 dB. Instant-NGP, FINER and GA-Planes gain 0.15 to 0.3 dB on average but lose to bicubic on more than a third of the images; the deep image prior and TensoRF do not beat it. Bicubic keeps the best LPIPS, by 0.015 over FUTON-sinc, which suggests the fields buy their PSNR at edges rather than in texture, the one thing a single low-resolution image cannot teach. PE-MLP is unstable under the L1 loss: the learning rate chosen on the tuning images still fails on 14 of the 100, which end below 20 dB and drag its mean to 22.6 dB.
+
 ## Reading the numbers
 
-- **Accuracy.** FUTON leads every column of the image table by a margin well beyond the error bars (1.8 dB over Instant-NGP), and the mean IoU on volumes, where the hash grid is its only close competitor. On radiance fields the mean is a narrow lead over FINER and SIREN, within one standard error.
-- **Speed.** FUTON-lanczos is the fastest model to train on images and the fastest radiance field; on volumes RFF and TensoRF train faster but reach a lower IoU. Instant-NGP, the other strong model, is 2 to 3× slower than FUTON here; its hash grid runs in plain PyTorch, like every other model, rather than in tiny-cuda-nn's fused kernels.
-- **The two bases** trade a little accuracy for speed: Lanczos costs 0.3 dB on images and nothing on volumes, and trains about a quarter faster on both; on radiance fields the gain is 8 %, since ray marching sets the pace there.
+- **Accuracy.** FUTON leads every column of the image table by a margin well beyond the error bars (1.8 dB over Instant-NGP), and the mean IoU on volumes, where the hash grid is its only close competitor. On radiance fields the mean is a narrow lead over FINER and SIREN, within one standard error; on super-resolution the lead over SIREN is 0.14 dB and holds on 76 of the 100 images.
+- **Speed.** FUTON-lanczos is the fastest model to train on images, radiance fields and super-resolution; on volumes RFF and TensoRF train faster but reach a lower IoU. Instant-NGP, the other strong model, is 1.4 to 3× slower than FUTON here; its hash grid runs in plain PyTorch, like every other model, rather than in tiny-cuda-nn's fused kernels.
+- **The two bases** trade a little accuracy for speed: Lanczos costs 0.3 dB on images, 0.2 dB on super-resolution and nothing on volumes or radiance fields. It trains about a quarter faster on images and volumes, 9 % faster on radiance fields, where ray marching sets the pace, and twice as fast on super-resolution, where a step evaluates seven times more points than on images and the per-point cost of a dense basis shows.
 
 The [ablations](ablations.md) take FUTON apart, and [Reproducing the paper](reproduce.md) has the commands that produced every number above.

@@ -27,18 +27,19 @@ NeuroField fits a signal as a function of its coordinates. It provides **FUTON**
 Most implicit neural representations hide their prior in the nonlinearity: sines, Gabor wavelets, Gaussians, or a hash-grid lookup in front of a ReLU network. FUTON puts the prior in the parameterization. The signal is expanded in a fixed, analytic basis along each coordinate axis, and the coefficient tensor of that expansion is stored in low-rank canonical polyadic (CP) form. The model is a shallow, parallel tensor contraction rather than a deep network:
 
 - **Fast.** A point costs O(CKR) for C axes, K basis functions per axis and rank R. With a compactly supported basis (Lanczos) only 2a taps per axis are touched, and fused Triton kernels contract them without forming dense features.
-- **Accurate at equal size.** At matched parameter counts FUTON leads every baseline on the average of each benchmark: Kodak images, Stanford occupancy volumes and Blender radiance fields.
+- **Accurate at equal size.** At matched parameter counts FUTON leads every baseline on the average of each benchmark: Kodak images, Stanford occupancy volumes, Blender radiance fields and DIV2K super-resolution.
 - **Transparent.** With a linear decoder FUTON *is* a rank-R CP model of the signal in the chosen basis, so bandwidth (K) and capacity (R) are explicit knobs.
 
 ## Results
 
-Every model of a task has the same parameter budget, the hyperparameters of its authors' code, and a learning rate chosen on the task. Times are mean training times per signal on an A100: for images and volumes every model was retrained alone on an exclusive node, for radiance fields the times come from the sweep's shared jobs. The [benchmarks page](https://pashtari.github.io/neurofield/experiments/benchmarks/) has every model, metric and error bar.
+Every model of a task has the same parameter budget, the hyperparameters of its authors' code, and a learning rate chosen on the task. Times are mean training times per signal on an A100: every model was retrained alone on an exclusive node, on two scenes for radiance fields and two images for super-resolution. The [benchmarks page](https://pashtari.github.io/neurofield/experiments/benchmarks/) has every model, metric and error bar.
 
 | Task | Signals | Params | FUTON-sinc | FUTON-lanczos | Strongest baseline |
 | --- | --- | --- | --- | --- | --- |
 | Images (Kodak) | 24 | 195k | **38.54 dB** in 8.1 s | 38.20 dB in **6.1 s** | Instant-NGP, 36.76 dB in 18.8 s |
 | Occupancy (Stanford) | 5 | 132k | **99.90 % IoU** in 10.3 s | **99.90 % IoU** in 7.5 s | Instant-NGP, 99.87 % in 17.2 s |
-| Radiance fields (Blender) | 8 | 75k | **28.95 dB** in 343 s | 28.93 dB in **315 s** | FINER, 28.85 dB in 445 s |
+| Radiance fields (Blender) | 8 | 75k | **28.95 dB** in 360 s | 28.93 dB in **327 s** | FINER, 28.85 dB in 502 s |
+| Super-resolution (DIV2K, 4×) | 100 | 500k | **28.83 dB** in 93 s | 28.65 dB in **48 s** | SIREN, 28.69 dB in 131 s |
 
 <p align="center">
   <img src="docs/assets/results_image.svg" width="920" alt="Kodak: PSNR against training time for FUTON and the strongest model of each family; every model's final PSNR against its training time; and against its inference rate">

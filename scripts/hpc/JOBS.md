@@ -54,8 +54,11 @@ models of `tensor_net` and `decoder` repeat those of `basis`, so that each
 study stands alone. One image per job keeps the jobs short:
 
 ```bash
-for study in basis tensor_net decoder; do  # about half an hour each over the 24 images
-  scripts/hpc/train.sh --clusters=accelgor --time=1:30:00 image --config configs/ablation-futon/$study.yaml
+# Every run costs about 20 s on top of its training (data, model and LPIPS
+# set-up, evaluation), so the basis study takes close to two hours over the 24
+# images with its two slow polynomial bases, the other two about an hour.
+for study in basis tensor_net decoder; do
+  scripts/hpc/train.sh --clusters=accelgor --time=2:30:00 image --config configs/ablation-futon/$study.yaml
 done
 # The components grid holds models up to 9.4M parameters, so one image per task.
 scripts/hpc/train.sh --clusters=accelgor --time=1:00:00 --array=1-24 image \
@@ -129,6 +132,9 @@ for image in 0882 0801; do
     "source $VSC_DATA/venvs/neurofield-env/bin/activate \
      && python scripts/train_super_resolution.py --data data/DIV2K/DIV2K_valid_HR/$image.png --overwrite --log-dir logs/timing/super_resolution"
 done
+# Its inference profile reads the example image's runs, so it follows the sweep.
+sbatch $common --time=0:30:00 --job-name=nf-speed-sr --wrap \
+  "source $VSC_DATA/venvs/neurofield-env/bin/activate && python scripts/profile_speed.py --tasks super_resolution"
 ```
 
 `report_paper.py` writes everything the paper needs into `results/`, and

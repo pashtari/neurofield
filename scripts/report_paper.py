@@ -295,8 +295,6 @@ def read(log_dir: Path, task: str) -> list[dict[str, Any]]:
         run = json.loads(path.read_text())
         if run["task"] == task:
             runs.append(run | {"directory": path.parent})
-    if not runs:
-        raise SystemExit(f"no {task} runs under {log_dir}")
     return runs
 
 
@@ -354,25 +352,34 @@ def timed(runs: list[dict[str, Any]], task: str) -> list[dict[str, Any]]:
     Accuracy comes from the sweeps, whose jobs shared their nodes, so their
     times carry whatever else ran beside them. logs/timing/<task> holds the
     same runs trained alone on an exclusive node, after a warm-up pass; where
-    such a run exists it replaces the sweep's (training is deterministic, so
-    the metrics agree), and the other runs lose their times, so that every
-    time in the tables and figures is a clean one and the mean over signals is
-    taken over the timed ones. Without timing runs, the sweep's times stand.
+    such a run exists, its training time and the elapsed time of every
+    evaluation replace the sweep's, while the metrics stay the sweep's (they
+    agree where training is deterministic, and radiance fields are not). The
+    other runs lose their times, so that every time in the tables and figures
+    is a clean one and the mean over signals is taken over the timed ones.
+    Without timing runs, the sweep's times stand.
     """
     directory = ROOT / "logs" / "timing" / task
     if not directory.exists():
         return runs
     clean = {(run["data"], run["model"]): run for run in read(directory, task)}
-    untimed = {"train_time": math.nan}
-    return [
-        clean.get(
-            (run["data"], run["model"]),
-            run
-            | untimed
-            | {"history": [entry | {"elapsed": math.nan} for entry in run["history"]]},
-        )
-        for run in runs
-    ]
+
+    def retimed(run: dict[str, Any]) -> dict[str, Any]:
+        timing = clean.get((run["data"], run["model"]))
+        if timing is None:
+            elapsed = [math.nan] * len(run["history"])
+            train_time = math.nan
+        elif len(timing["history"]) == len(run["history"]):
+            elapsed = [entry["elapsed"] for entry in timing["history"]]
+            train_time = timing["train_time"]
+        else:  # the two runs did not log alike, so take the clean run whole
+            return timing
+        history = [
+            entry | {"elapsed": value} for entry, value in zip(run["history"], elapsed)
+        ]
+        return run | {"train_time": train_time, "history": history}
+
+    return [retimed(run) for run in runs]
 
 
 def profiled(final: pd.DataFrame, task: str) -> pd.DataFrame:
@@ -395,9 +402,11 @@ def profiled(final: pd.DataFrame, task: str) -> pd.DataFrame:
 def load(task: str) -> tuple[list[dict[str, Any]], pd.DataFrame, pd.DataFrame]:
     """A task's runs, its final metrics and its curves, with one TensoRF."""
     others = {"TensoRF", "TensoRF-CP", "TensoRF-VM"} - {TENSORF[task]}
+    if not (runs := read(ROOT / "logs" / task, task)):
+        raise SystemExit(f"no {task} runs under logs/{task}")
     runs = [
         run | {"model": "TensoRF" if run["model"] == TENSORF[task] else run["model"]}
-        for run in timed(read(ROOT / "logs" / task, task), task)
+        for run in timed(runs, task)
         if run["model"] not in others
     ]
     return runs, profiled(results(runs), task), curves(runs)
@@ -761,6 +770,9 @@ def tables(final: pd.DataFrame, task: str) -> dict[str, str]:
     # and NeuRBF report them; the inference rate stays in the throughput plot.
     spec = {"parameters": PARAMS, "time": ("", "Train time (s)", False, 1)}
     values = final.groupby("model")[list(spec)].mean()
+    # Interpolations have no parameters and train nothing, so neither column
+    # applies to them, nor should they top its ranking.
+    values[values["time"] <= 0] = np.nan
     errors = paired_error(final, metrics)
     if task in ("image", "super_resolution"):  # many images, so their mean alone
         for metric in metrics:
@@ -1468,6 +1480,7 @@ def main() -> None:
             print(f"{task}: no runs under logs/{task}, skipped")
             continue
         runs, final, curve = load(task)
+        (out_dir / task).mkdir(parents=True, exist_ok=True)
         for suffix, text in tables(final, task).items():
             (out_dir / task / f"table.{suffix}").write_text(text)
         if not final["model"].isin(FEATURED).any():  # a sweep still running

@@ -68,15 +68,13 @@ The FUTON ablations are configs in `configs/ablation-futon/`, run through the sa
 | `basis.yaml` | image | 6 | The six bases at the benchmark's size. |
 | `components_rank.yaml` | image | 50 | The components per axis as a fraction $\alpha$ of the pixels, $K = (\alpha H, \alpha W)$, and the rank as a fraction $\beta$ of the smaller count, $R = \beta \min(K_1, K_2)$, both over {1/8, 1/4, 1/2, 1, 2}, sinc and Lanczos. |
 | `tensor_net.yaml` | image | 4 | Tensor-ring against CP, both bases. |
-| `decoder.yaml` | image | 6 | Linear against MLP decoder, at equal size and at equal rank. |
-| `decoder_image.yaml` | image | 12 | The linear decoder along the iso-parameter curve, with MLP controls. |
+| `decoder.yaml` | image | 4 | Linear against MLP decoder, at equal size. |
 | `components_nerf.yaml` | nerf | 2 | $K = 256$ at the rank that pays for it, against the benchmark. |
 
 The image studies run on all 24 Kodak images at the benchmark's settings (2000 epochs on 10 % of the pixels per step, learning rate 3e-2); a model's name carries its fractions as decimals, so `FUTON-sinc-a0.5-b1` has $K = (H/2, W/2)$ and $R = H/2$.
 
 ```bash
 python scripts/train_image.py --config configs/ablation-futon/components_rank.yaml
-python scripts/train_image.py --config configs/ablation-futon/decoder_image.yaml --data data/Kodak/kodim19.png
 python scripts/train_nerf.py --config configs/ablation-futon/components_nerf.yaml --data data/nerf/blender/lego
 ```
 
@@ -93,7 +91,7 @@ results/
 ├── <task>/table.{tex,md}            size, training time and final metrics, best in bold, second underlined
 ├── <task>/qualitative_<signal>.pdf  the signal with two regions boxed and magnified for every featured model
 ├── <task>/panels/<signal>/          the renders those magnifications are cut from, rebuilt from the checkpoints
-└── ablation/                        the basis table and plot, the combiner table and plot, PSNR against each fraction
+└── ablation/                        a table and a convergence plot each for the bases, the combiners and the decoders, and PSNR against each fraction
 ```
 
 ```bash

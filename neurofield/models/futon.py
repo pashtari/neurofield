@@ -407,7 +407,7 @@ class LanczosBasis(_LocalBasis):
         num_components: Number of centers ``K_c >= 2 * radius``, shared or per
             axis.
         radius: Kernel radius in grid steps: ``2`` gives Lanczos-2 (four taps),
-            ``3`` gives Lanczos-3 (six taps).
+            ``3`` (the default) gives Lanczos-3 (six taps).
         normalize: L2-normalize each feature vector.
         grid_size: Per-axis cache size in dense mode; ignored when sparse.
         sparse: Return :class:`RCSMatrix` features with ``2 * radius`` taps per
@@ -423,7 +423,7 @@ class LanczosBasis(_LocalBasis):
         self,
         in_features: int,
         num_components: int | Sequence[int],
-        radius: int = 2,
+        radius: int = 3,
         normalize: bool = True,
         grid_size: int | Sequence[int] | None = None,
         sparse: bool = True,

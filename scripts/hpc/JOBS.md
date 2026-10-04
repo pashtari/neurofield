@@ -43,13 +43,12 @@ decoder (194,435 parameters).
 | `basis` | `FUTON-<basis>`, 6 | cosine, lanczos, sinc, triangle, chebyshev and legendre, at the default size |
 | `components_rank` | `FUTON-<basis>-a<alpha>-b<beta>`, 50 | K = (alpha H, alpha W) and R = beta min(K), both over {1/8, 1/4, 1/2, 1, 2}, for lanczos and sinc |
 | `tensor_net` | `FUTON-<basis>` and `FUTON-<basis>-TR`, 4 | a tensor-ring combiner against the default CP one, for lanczos and sinc |
-| `decoder` | `FUTON-<basis>`, `-linear` and `-linear-R224`, 6 | the paper's linear decoder against the benchmark's MLP, at equal size and at equal rank |
+| `decoder` | `FUTON-<basis>` and `-linear`, 4 | the paper's linear decoder against the benchmark's MLP, at equal size |
 
 A tensor ring of rank `r` has the size of a CP combiner of rank `r^2`; rank 15
 gives 195,528 parameters, the closest to the CP model's 194,435. The MLP
 decoder holds 51,075 of those parameters, 26% of the model, which a linear
-decoder returns to the combiner as CP rank 302 (194,189 parameters); rank 224
-is kept as well, to separate the parameters from the nonlinearity. The CP
+decoder returns to the combiner as CP rank 302 (194,189 parameters). The CP
 models of `tensor_net` and `decoder` repeat those of `basis`, so that each
 study stands alone. One image per job keeps the jobs short:
 
@@ -175,11 +174,11 @@ style names the member, the stronger of a pair solid: SIREN and FINER share
 the periodic-activation hue, as do the two FUTON bases. A shared `legend.pdf`
 sits beside the task folders.
 
-The FUTON ablations go to `results/ablation/`: `basis` as a table and a
-convergence plot, `combiner_decoder` as one table of the tensor ring and the
-linear decoder against the benchmark's CP and MLP, `tensor_net` as a
-convergence plot, and the components study as IoU against R at each K and
-against K at each R, one figure per basis.
+The FUTON ablations go to `results/ablation/`: `basis`, `tensor_net` and
+`decoder` each as a table and a convergence plot, the tensor ring against CP
+and the linear decoder against the MLP for both bases, and the components
+study as PSNR against the rank fraction at each component fraction and the
+reverse, one figure per basis, for the fractions 1/4 to 2.
 
 `--orbit 60` also saves an orbit GIF of each NeRF model beside its panel, for
 a talk. It costs about a minute a scene and the paper takes none of them, so

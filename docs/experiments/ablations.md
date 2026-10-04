@@ -39,7 +39,7 @@ Parameters per cell, $R^2 + (h + w + 4) R + 3$ for $K = (h, w)$; the benchmark's
 <figure markdown="span">
   ![PSNR against β at each α](../assets/ablation_beta_sinc.svg){ width="520" }
   ![PSNR against α at each β](../assets/ablation_alpha_sinc.svg){ width="520" }
-  <figcaption>PSNR against the rank factor β, one curve per component factor α; and the same runs against α, one curve per β.</figcaption>
+  <figcaption>PSNR against the rank factor β, one curve per component factor α; and the same runs against α, one curve per β. The 1/8 level of either is left to the table: its models are too small to matter and only compress the axis.</figcaption>
 </figure>
 
 Mean PSNR (dB) over the 24 images for the sinc basis:
@@ -58,28 +58,32 @@ Rank is the lever that keeps paying: at every α, each doubling of β raises the
 
 A tensor-ring combiner against the CP one, at the default K, for both bases. A ring of rank $r$ has the size of a CP combiner of rank $r^2$; rank 15 (195,528 parameters) is the closest match to the CP model (194,435).
 
-| Combiner, decoder | Params (k) | FUTON-sinc time (s) ↓ | FUTON-sinc PSNR (dB) ↑ | FUTON-lanczos time (s) ↓ | FUTON-lanczos PSNR (dB) ↑ |
+| Combiner | Params (k) | FUTON-sinc time (s) ↓ | FUTON-sinc PSNR (dB) ↑ | FUTON-lanczos time (s) ↓ | FUTON-lanczos PSNR (dB) ↑ |
 | --- | --- | --- | --- | --- | --- |
-| CP, MLP | 194.4 | **8.3** | **38.54** ± 0.04 | **6.6** | **38.20** ± 0.04 |
-| TR, MLP | 195.5 | 13.0 | 38.44 ± 0.04 | 10.8 | 38.08 ± 0.04 |
+| CP | 194.4 | **8.2** | **38.54** ± 0.05 | **6.1** | **38.20** ± 0.03 |
+| TR | 195.5 | *13.0* | *38.44* ± 0.04 | *10.8* | *38.08* ± 0.04 |
 
 <figure markdown="span">
   ![Combiner convergence](../assets/ablation_tensor_net.svg){ width="520" }
 </figure>
 
-CP wins on both counts, by 0.1 dB and 1.6× in training time. The ring's $r \times r$ matrices per point cost more to contract than CP's $R$ products, and its output is only $r^2 = 225$ wide, which the decoder then has to close.
+CP wins on both counts, by 0.1 dB and 1.6 to 1.8× in training time. The ring's $r \times r$ matrices per point cost more to contract than CP's $R$ products, and its output is only $r^2 = 225$ wide, which the decoder then has to close.
 
 ## Decoder
 
-The paper's model has a linear decoder, which makes FUTON exactly a rank-$R$ CP model of the signal; the benchmarks use a one-layer MLP. Replacing the MLP by a linear map at rank 224 frees 50,400 parameters (144,035 remain), and spending them on the combiner raises the rank to 302 at the benchmark's size (194,189); the rank-224 linear model isolates the nonlinearity from the parameters.
+The paper's model has a linear decoder, which makes FUTON exactly a rank-$R$ CP model of the signal; the benchmarks use a one-layer MLP. The two are compared at equal size: replacing the MLP by a linear map frees 50,400 parameters, which the combiner spends on raising the rank from 224 to 302, 194,189 parameters against the benchmark's 194,435.
 
-| Decoder | CP rank | Params (k) | FUTON-sinc PSNR (dB) | FUTON-lanczos PSNR (dB) |
-| --- | --- | --- | --- | --- |
-| MLP, 1 hidden layer | 224 | 194.4 | **38.54** | **38.20** |
-| linear | 302 | 194.2 | 30.40 | 29.95 |
-| linear | 224 | 144.0 | 30.16 | 29.74 |
+| Decoder | Params (k) | FUTON-sinc time (s) ↓ | FUTON-sinc PSNR (dB) ↑ | FUTON-lanczos time (s) ↓ | FUTON-lanczos PSNR (dB) ↑ |
+| --- | --- | --- | --- | --- | --- |
+| MLP, 1 hidden layer (R = 224) | 194.4 | *8.2* | **38.54** ± 0.16 | *6.2* | **38.20** ± 0.15 |
+| Linear (R = 302) | 194.2 | **7.6** | *30.40* ± 0.16 | **4.7** | *29.95* ± 0.15 |
 
-A natural image is far from a low-rank tensor in a smooth basis: at equal size the linear model reaches 30.4 dB, and the extra rank it buys over the rank-224 one is worth 0.2 dB, while the one-layer MLP adds 8 dB on top of it. The MLP decoder is therefore the default, and the linear decoder remains the model to reason about.
+<figure markdown="span">
+  ![Decoder convergence](../assets/ablation_decoder.svg){ width="520" }
+  <figcaption>PSNR against training time for the MLP and the linear decoder, for both bases.</figcaption>
+</figure>
+
+A natural image is far from a low-rank tensor in a smooth basis: at equal size the linear model stops at 30.4 dB, 8 dB below the MLP. It trains faster, its steps being cheaper, but it is flat from the first seconds where the MLP keeps climbing. The MLP decoder is therefore the default, and the linear decoder remains the model to reason about.
 
 ## Radiance fields
 

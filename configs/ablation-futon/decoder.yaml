@@ -2,8 +2,7 @@
 # linear decoder; the benchmark's one-layer MLP is an extension that spends
 # 51,075 of its 194,435 parameters there, 26% of the model. A linear decoder
 # frees them for the combiner, so CP rank 302 brings it back to 194,189
-# parameters; rank 224, the MLP model's, is kept as well to separate what the
-# extra parameters buy from what the nonlinearity buys (144,035).
+# parameters, and the two are compared at that equal size.
 #     python scripts/train_image.py --config configs/ablation-futon/decoder.yaml
 # The data and training settings repeat configs/image.yaml.
 
@@ -49,24 +48,6 @@ models:
     kwargs:
       basis: [sinc, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
       combiner: [cp, {rank: 302}]
-      decoder: linear
-      output_activation: tanh
-    train: {lr: 3.0e-2}
-
-  FUTON-lanczos-linear-R224:  # equal rank
-    class: FUTON
-    kwargs:
-      basis: [lanczos, {num_components: [H // 2, W // 2], radius: 3}]
-      combiner: [cp, {rank: 224}]
-      decoder: linear
-      output_activation: tanh
-    train: {lr: 3.0e-2}
-
-  FUTON-sinc-linear-R224:  # equal rank
-    class: FUTON
-    kwargs:
-      basis: [sinc, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
-      combiner: [cp, {rank: 224}]
       decoder: linear
       output_activation: tanh
     train: {lr: 3.0e-2}

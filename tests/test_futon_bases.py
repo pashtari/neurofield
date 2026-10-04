@@ -43,7 +43,7 @@ class TestKernel:
         [
             (TriangleBasis(1, 32), 2),
             (LanczosBasis(1, 32, radius=1), 2),
-            (LanczosBasis(1, 32), 4),  # default radius=2 -> Lanczos-2
+            (LanczosBasis(1, 32), 6),  # default radius=3 -> Lanczos-3
             (LanczosBasis(1, 32, radius=3), 6),
         ],
     )
@@ -364,11 +364,12 @@ class TestNumComponents:
 
         x = torch.rand(20, 3) * 2 - 1
         shared = BASES[name](3, 8, normalize=False)
-        per_axis = BASES[name](3, [4, 8, 6], normalize=False)
+        # At least 2 * radius = 6 components per axis for the default Lanczos-3.
+        per_axis = BASES[name](3, [6, 8, 10], normalize=False)
         assert shared.num_components == [8, 8, 8]
-        assert per_axis.num_components == [4, 8, 6]
+        assert per_axis.num_components == [6, 8, 10]
         features = [dense(f) for f in per_axis(x)]
-        assert [f.shape for f in features] == [(20, 4), (20, 8), (20, 6)]
+        assert [f.shape for f in features] == [(20, 6), (20, 8), (20, 10)]
         # Axis 1 has the same count in both bases, so its features must match.
         assert torch.allclose(dense(shared(x)[1]), features[1])
 

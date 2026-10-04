@@ -22,11 +22,15 @@ Writes results/, which holds the paper's figures and tables and nothing else:
     <task>/panels/<signal>/          the renders those magnifications are cut from,
                                      rebuilt from the checkpoints and kept, so that
                                      recomposing a figure needs no GPU
-    ablation/basis.{tex,md}          every basis at the benchmark's size
-    ablation/combiner_decoder.{tex,md}  the combiner and the decoder, for both bases
+    ablation/basis.{tex,md,pdf,pgf}  every basis at the benchmark's size, as a
+                                     table and as PSNR against training time
+    ablation/tensor_net.{tex,md,pdf,pgf}  the tensor-ring combiner against CP,
+                                     for both bases, likewise
+    ablation/decoder.{tex,md,pdf,pgf}  the linear decoder against the MLP,
+                                     likewise
     ablation/beta_<basis>.{pdf,pgf}  PSNR against the rank fraction at each
                                      component fraction, and alpha_<basis> the
-                                     reverse
+                                     reverse, for the fractions 1/4 to 2
 
 Tables mark the best value in bold and the second underlined. Drawing the panels
 needs the signals in data/ and a GPU; --no-panels leaves them out, and
@@ -214,19 +218,24 @@ GRID = re.compile(r"FUTON-(?P<basis>\w+)-a(?P<alpha>[\d.]+)-b(?P<beta>[\d.]+)$")
 FRACTIONS = {0.125: "1/8", 0.25: "1/4", 0.5: "1/2", 1.0: "1", 2.0: "2"}
 BASES = ("Cosine", "Chebyshev", "Legendre", "Triangle", "Lanczos", "Sinc")
 PAIR = ("sinc", "lanczos")
-VARIANTS = {  # row: the model it stands for, in whichever study ran it
-    "CP, MLP": "FUTON-{basis}",
-    "TR, MLP": "FUTON-{basis}-TR",
-    "CP, linear (R = 302)": "FUTON-{basis}-linear",
-    "CP, linear (R = 224)": "FUTON-{basis}-linear-R224",
+# Per study, its table's rows and the model each stands for, with the basis to
+# fill in; the benchmark's model heads both.
+COMBINERS = {"CP": "FUTON-{basis}", "TR": "FUTON-{basis}-TR"}
+DECODERS = {
+    "MLP, 1 hidden layer (R = 224)": "FUTON-{basis}",
+    "Linear (R = 302)": "FUTON-{basis}-linear",
 }
+# The fractions the grid figures draw: the 1/8 level only compresses the axis.
+SHOWN = (0.25, 0.5, 1.0, 2.0)
+# Where a study's legend goes when "best" would still cover a curve.
+LEGEND_LOC = {"decoder": "upper left"}
 PARAMS = ("", "# Params (k)", None, 1)  # the column every table opens with
 DASHES = ("", (4, 2), (1, 1.5))  # solid, dashed, dotted
-# The convergence of the two studies that get a curve, as label, colour and
+# The convergence of the three studies that get a curve, as label, colour and
 # dashes per model: a hue names the choice under study and the dashes the basis
 # it is made with, but for the bases themselves, where the hue separates the
-# compactly supported ones from those that span the axis. The decoder study
-# keeps to its table, and the rank study to its figures.
+# compactly supported ones from those that span the axis. The rank study keeps
+# to its figures.
 CURVES = {
     "basis": {
         "FUTON-cosine": ("Cosine", PALETTE[1], DASHES[0]),
@@ -241,6 +250,12 @@ CURVES = {
         "FUTON-lanczos": ("CP, lanczos", PALETTE[0], DASHES[1]),
         "FUTON-sinc-TR": ("TR, sinc", PALETTE[2], DASHES[0]),
         "FUTON-lanczos-TR": ("TR, lanczos", PALETTE[2], DASHES[1]),
+    },
+    "decoder": {
+        "FUTON-sinc": ("MLP, sinc", PALETTE[0], DASHES[0]),
+        "FUTON-lanczos": ("MLP, lanczos", PALETTE[0], DASHES[1]),
+        "FUTON-sinc-linear": ("Linear, sinc", PALETTE[1], DASHES[0]),
+        "FUTON-lanczos-linear": ("Linear, lanczos", PALETTE[1], DASHES[1]),
     },
 }
 
@@ -509,6 +524,19 @@ def log_ticks(axis: Axis) -> None:
     axis.set_minor_formatter(NullFormatter())
 
 
+def quality_ticks(plot: plt.Axes, metric: str, low: float, high: float) -> None:
+    """Set the quality axis: whole decibels for PSNR, tenths for IoU.
+
+    A PSNR tick with decimals reads as a precision the plots do not have, so
+    the limits widen to whole numbers and the ticks fall on them; IoU keeps
+    its tenths, on which the models separate.
+    """
+    if metric == "psnr":
+        low, high = math.floor(low), math.ceil(high)
+    plot.set_ylim(low, high)
+    plot.yaxis.set_major_locator(MaxNLocator(5, integer=metric == "psnr"))
+
+
 def padded(values: pd.Series, fraction: float = 0.08) -> tuple[float, float]:
     """Limits that leave a margin, so that no marker is clipped by a spine."""
     low, high = values.min(), values.max()
@@ -561,6 +589,8 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
     ].mean()
     low, high = y_range(means, metric)
     low = max(low, FLOOR.get(task, low))
+    if metric == "psnr":
+        low, high = math.floor(low), math.ceil(high)
     shown = means[means[metric].between(low, high)]["time"]
     # The marker the legend carries, at the end of each curve.
     for model, (color, _, filled) in FEATURED.items():
@@ -573,11 +603,11 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
     plot.set(
         xscale="log",
         xlim=(shown.min() / 1.1, means["time"].max() * 1.1),
-        ylim=(low, high),
         xlabel="Training time (s)",
         ylabel=label,
     )
     log_ticks(plot.xaxis)
+    quality_ticks(plot, metric, low, high)
     if not math.isnan(reference):
         plot.axhline(reference, color="0.4", linestyle=":", linewidth=0.8, zorder=1)
     return figure
@@ -619,14 +649,9 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
         )
     # Explicit limits, so that the pair of figures shares a quality axis and
     # no marker touches a spine.
-    plot.set(
-        xlim=padded(trained[cost]),
-        ylim=padded(trained[metric]),
-        xlabel=axis,
-        ylabel=label,
-    )
+    plot.set(xlim=padded(trained[cost]), xlabel=axis, ylabel=label)
     plot.xaxis.set_major_locator(MaxNLocator(5))
-    plot.yaxis.set_major_locator(MaxNLocator(5))
+    quality_ticks(plot, metric, *padded(trained[metric]))
     return figure
 
 
@@ -1269,11 +1294,14 @@ def basis_table(runs: list[dict]) -> dict[str, str]:
     return table(summary, spec, errors, order=BASES, index="Basis")
 
 
-def component_table(summaries: dict[str, pd.DataFrame]) -> dict[str, str]:
-    """The combiner and the decoder, for both of the benchmark's bases.
+def variant_table(
+    summary: pd.DataFrame, variants: dict[str, str], index: str
+) -> dict[str, str]:
+    """A study's variants against the benchmark's model, for both bases.
 
-    The studies share the benchmark's model and define it alike, so its row
-    comes from the first that ran it. A variant nothing ran is left out.
+    ``variants`` maps each row to the model it stands for, with the basis to
+    fill in, and ``index`` heads the rows. A row either basis lacks is left
+    out.
     """
     spec = {"parameters": PARAMS}
     for basis in PAIR:
@@ -1281,15 +1309,11 @@ def component_table(summaries: dict[str, pd.DataFrame]) -> dict[str, str]:
         spec[f"psnr_{basis}"] = (f"FUTON-{basis}", "PSNR (dB)", True, 2)
 
     values, errors = {}, {}
-    for label, template in VARIANTS.items():
-        rows = {}
-        for basis in PAIR:
-            name = template.format(basis=basis)
-            found = (s for s in summaries.values() if name in s.index)
-            if (summary := next(found, None)) is not None:
-                rows[basis] = summary.loc[name]
-        if len(rows) < len(PAIR):
+    for label, template in variants.items():
+        names = {basis: template.format(basis=basis) for basis in PAIR}
+        if any(name not in summary.index for name in names.values()):
             continue
+        rows = {basis: summary.loc[name] for basis, name in names.items()}
         values[label] = {"parameters": rows[PAIR[0]]["parameters"]} | {
             f"{field}_{basis}": rows[basis][field]
             for basis in PAIR
@@ -1302,8 +1326,8 @@ def component_table(summaries: dict[str, pd.DataFrame]) -> dict[str, str]:
         pd.DataFrame(values).T,
         spec,
         pd.DataFrame(errors).T,
-        order=list(VARIANTS),
-        index="Combiner, decoder",
+        order=list(variants),
+        index=index,
     )
 
 
@@ -1312,11 +1336,13 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
 
     The components per axis are ``alpha`` times the pixels and the rank
     ``beta`` times the smaller component count, so the figures read in units
-    of the image rather than in absolute sizes.
+    of the image rather than in absolute sizes. The 1/8 level of either is
+    left out: its models are too small to matter and only compress the axis.
     """
     data = results(runs).assign(iteration=0)  # one evaluation, the last
     data = data.join(data["model"].str.extract(GRID))
     data[["alpha", "beta"]] = data[["alpha", "beta"]].astype(float)
+    data = data[data["alpha"].isin(SHOWN) & data["beta"].isin(SHOWN)]
     data["psnr"] = within_signal(data, "psnr")
     labels = {
         "alpha": r"Components per pixel $\alpha$",
@@ -1334,7 +1360,7 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
                 markers=True,
                 dashes=False,
                 errorbar=("se", 1),
-                palette=list(RAMP[: rows[hue].nunique()]),
+                palette=list(RAMP[-rows[hue].nunique() :]),
                 markersize=4,
                 markeredgecolor="white",
                 markeredgewidth=0.5,
@@ -1347,6 +1373,7 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
                 levels, [FRACTIONS.get(level, f"{level:g}") for level in levels]
             )
             plot.xaxis.set_minor_locator(NullLocator())
+            plot.yaxis.set_major_locator(MaxNLocator(5, integer=True))
             # A white ground under the legend, since "best" still puts it over
             # a curve in a panel this small.
             handles, texts = plot.get_legend_handles_labels()
@@ -1365,13 +1392,16 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
 
 
 def study_curves(
-    curve: pd.DataFrame, styles: dict[str, tuple[str, str, tuple]], path: Path
+    curve: pd.DataFrame,
+    styles: dict[str, tuple[str, str, tuple]],
+    path: Path,
+    loc: str = "best",
 ) -> None:
     """PSNR against training time for a study's models, with its own legend.
 
     ``styles`` gives each model its label, colour and dashes, in the order the
-    legend takes them. The band is one within-signal standard error, as in the
-    task figures.
+    legend takes them, and ``loc`` places the legend. The band is one
+    within-signal standard error, as in the task figures.
     """
     curve = curve[curve["model"].isin(styles)]
     curve = curve.assign(
@@ -1397,21 +1427,23 @@ def study_curves(
         ["psnr", "time"]
     ].mean()
     low, high = y_range(means, "psnr")
+    low, high = math.floor(low), math.ceil(high)
     shown = means[means["psnr"].between(low, high)]["time"]
     plot.set(
         xscale="log",
         xlim=(shown.min() / 1.1, means["time"].max() * 1.1),
-        ylim=(low, high),
         xlabel="Training time (s)",
         ylabel="PSNR (dB)",
     )
     log_ticks(plot.xaxis)
+    quality_ticks(plot, "psnr", low, high)
     handles = [
         Line2D([], [], color=color, dashes=dashes or (None, None), label=label)
         for label, color, dashes in styles.values()
     ]
     plot.legend(
         handles=handles,
+        loc=loc,
         framealpha=0.85,
         edgecolor="none",
         ncol=2,
@@ -1436,16 +1468,19 @@ def ablation(out_dir: Path) -> None:
         for name, runs in studies.items()
     )
     print(f"ablation: {counts} models")
-    summaries = {name: summarize(runs) for name, runs in studies.items() if runs}
     if studies["basis"]:
         write(basis_table(studies["basis"]), out_dir / "basis")
     if studies["components_rank"]:
         grid_figures(studies["components_rank"], out_dir)
-    if combined := component_table(summaries):
-        write(combined, out_dir / "combiner_decoder")
+    tabled = {"tensor_net": (COMBINERS, "Combiner"), "decoder": (DECODERS, "Decoder")}
+    for name, (variants, index) in tabled.items():
+        if studies[name]:
+            table_of = variant_table(summarize(studies[name]), variants, index)
+            write(table_of, out_dir / name)
     for name, styles in CURVES.items():
         if studies[name]:
-            study_curves(curves(studies[name]), styles, out_dir / name)
+            loc = LEGEND_LOC.get(name, "best")
+            study_curves(curves(studies[name]), styles, out_dir / name, loc)
 
 
 def main() -> None:

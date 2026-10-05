@@ -68,6 +68,12 @@ class HashEncoding(nn.Module):
 
     The learnable ``embeddings`` concatenate all levels and start uniformly
     in ``[-1e-4, 1e-4]``.
+
+    The forward pass handles every level at once, as one batched tensor
+    operation per step rather than a loop over levels: the arithmetic is the
+    same, so the features are identical, but a pass costs a few dozen kernel
+    launches instead of a few hundred, which is what sets the encoding's time
+    on the small batches a ray marcher or a training step feeds it.
     """
 
     def __init__(
@@ -86,7 +92,6 @@ class HashEncoding(nn.Module):
         self.num_levels = num_levels
         self.features_per_level = features_per_level
 
-        # Python scalars avoid device synchronization inside the level loop.
         self.scales = _level_scales(num_levels, base_resolution, max_resolution)
         self.resolutions = [math.ceil(scale) + 1 for scale in self.scales]
         self.table_sizes = [
@@ -96,6 +101,23 @@ class HashEncoding(nn.Module):
         self.offsets = [0]
         for size in self.table_sizes[:-1]:
             self.offsets.append(self.offsets[-1] + size)
+        # The per-level constants as tensors, for the batched forward pass. A
+        # level whose vertices outnumber its table is hashed, the others are
+        # indexed densely.
+        levels = {
+            "level_scales": torch.tensor(self.scales, dtype=torch.float32),
+            "level_resolutions": torch.tensor(self.resolutions, dtype=torch.long),
+            "level_table_sizes": torch.tensor(self.table_sizes, dtype=torch.long),
+            "level_offsets": torch.tensor(self.offsets, dtype=torch.long),
+            "level_hashed": torch.tensor(
+                [
+                    size < resolution**in_features
+                    for resolution, size in zip(self.resolutions, self.table_sizes)
+                ]
+            ),
+        }
+        for name, value in levels.items():
+            self.register_buffer(name, value, persistent=False)
 
         self.register_buffer(
             "corners",
@@ -116,40 +138,33 @@ class HashEncoding(nn.Module):
         """Number of output features, ``num_levels * features_per_level``."""
         return self.num_levels * self.features_per_level
 
-    def _index(self, vertices: Tensor, resolution: int, table_size: int) -> Tensor:
-        """Table index of integer grid vertices ``(..., C)`` at one level."""
-        if table_size < resolution**self.in_features:
-            # Spatial hash; the reference's uint32 wraparound only affects bits
-            # above log2(table_size), so int64 arithmetic gives the same index.
-            hashed = vertices * self.primes
-            index = hashed[..., 0]
-            for dim in range(1, self.in_features):
-                index = index ^ hashed[..., dim]
-        else:
-            # Dense stride index with the first coordinate varying fastest.
-            index = vertices[..., -1]
-            for dim in range(self.in_features - 2, -1, -1):
-                index = index * resolution + vertices[..., dim]
-        return index % table_size
-
     def forward(self, x: Tensor) -> Tensor:
         batch_shape = x.shape[:-1]
         unit_x = (x.reshape(-1, self.in_features) + 1) / 2
 
-        features: list[Tensor] = []
-        for scale, resolution, table_size, offset in zip(
-            self.scales, self.resolutions, self.table_sizes, self.offsets
-        ):
-            position = unit_x * scale + 0.5
-            grid = position.floor()
-            fraction = (position - grid).unsqueeze(1)  # (N, 1, C)
-            vertices = grid.long().unsqueeze(1) + self.corners  # (N, 2^C, C)
-            index = self._index(vertices, resolution, table_size)
-            corner_features = self.embeddings[offset + index]  # (N, 2^C, F)
-            weights = torch.where(self.corners.bool(), fraction, 1 - fraction).prod(-1)
-            features.append((weights.unsqueeze(-1) * corner_features).sum(1))
+        # Every level at once: (N, L, C) positions, (N, L, 2^C, C) vertices.
+        position = unit_x.unsqueeze(1) * self.level_scales.view(1, -1, 1) + 0.5
+        grid = position.floor()
+        fraction = (position - grid).unsqueeze(2)
+        vertices = grid.long().unsqueeze(2) + self.corners
 
-        out = torch.cat(features, dim=-1)
+        # Spatial hash; the reference's uint32 wraparound only affects bits
+        # above log2(table_size), so int64 arithmetic gives the same index.
+        hashed = vertices * self.primes
+        hash_index = hashed[..., 0]
+        for dim in range(1, self.in_features):
+            hash_index = hash_index ^ hashed[..., dim]
+        # Dense stride index with the first coordinate varying fastest.
+        resolution = self.level_resolutions.view(1, -1, 1)
+        dense_index = vertices[..., -1]
+        for dim in range(self.in_features - 2, -1, -1):
+            dense_index = dense_index * resolution + vertices[..., dim]
+        index = torch.where(self.level_hashed.view(1, -1, 1), hash_index, dense_index)
+        index = index % self.level_table_sizes.view(1, -1, 1)
+
+        corner_features = self.embeddings[self.level_offsets.view(1, -1, 1) + index]
+        weights = torch.where(self.corners.bool(), fraction, 1 - fraction).prod(-1)
+        out = (weights.unsqueeze(-1) * corner_features).sum(2)  # (N, L, F)
         return out.reshape(*batch_shape, self.out_features)
 
 

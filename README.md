@@ -36,8 +36,8 @@ Every model of a task has the same parameter budget, the hyperparameters of its 
 
 | Task | Signals | Params | FUTON-sinc | FUTON-lanczos | Strongest baseline |
 | --- | --- | --- | --- | --- | --- |
-| Images (Kodak) | 24 | 195k | **38.54 dB** in 8.1 s | 38.20 dB in **6.1 s** | Instant-NGP, 36.76 dB in 18.8 s |
-| Occupancy (Stanford) | 5 | 132k | **99.90 % IoU** in 10.3 s | **99.90 % IoU** in 7.5 s | Instant-NGP, 99.87 % in 17.2 s |
+| Images (Kodak) | 24 | 195k | **38.54 dB** in 8.1 s | 38.20 dB in **6.1 s** | Instant-NGP, 36.76 dB in 6.3 s |
+| Occupancy (Stanford) | 5 | 132k | **99.90 % IoU** in 10.3 s | **99.90 % IoU** in 7.5 s | Instant-NGP, 99.87 % in 10.3 s |
 | Radiance fields (Blender) | 8 | 75k | **28.95 dB** in 360 s | 28.93 dB in **327 s** | FINER, 28.85 dB in 502 s |
 | Super-resolution (DIV2K, 4×) | 100 | 500k | **28.83 dB** in 93 s | 28.65 dB in **48 s** | SIREN, 28.69 dB in 131 s |
 

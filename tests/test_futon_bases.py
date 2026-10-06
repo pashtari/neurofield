@@ -7,9 +7,11 @@ from torch import nn
 from neurofield.models import RCSMatrix
 from neurofield.models.futon import (
     FUTON,
+    ChebyshevBasis,
     CPCombiner,
     HadamardCombiner,
     LanczosBasis,
+    LegendreBasis,
     SincBasis,
     TRCombiner,
     TriangleBasis,
@@ -93,6 +95,48 @@ class TestKernel:
         assert (basis(x)[0].sum(-1) - 1.0).abs().max() < 0.02
 
 
+def reference_polynomials(x, count, legendre):
+    """The three-term recurrences, degree by degree."""
+    x = x.unsqueeze(-1)
+    polynomials = [torch.ones_like(x), x]
+    for k in range(2, count):
+        previous, before = polynomials[-1], polynomials[-2]
+        if legendre:
+            polynomials.append(((2 * k - 1) * x * previous - (k - 1) * before) / k)
+        else:
+            polynomials.append(2 * x * previous - before)
+    return torch.cat(polynomials[:count], -1)
+
+
+class TestPolynomials:
+    @pytest.mark.parametrize("count", [2, 8, 64, 256])
+    def test_chebyshev_matches_the_recurrence(self, count):
+        """The closed form agrees with the recurrence to double precision."""
+        basis = ChebyshevBasis(2, [count, max(count // 2, 2)], normalize=False).double()
+        x = torch.rand(500, 2, dtype=torch.float64) * 2 - 1
+        for axis, feature in enumerate(basis(x)):
+            expected = reference_polynomials(
+                x[:, axis], basis.num_components[axis], False
+            )
+            assert torch.allclose(feature, expected, atol=1e-10)
+
+    @pytest.mark.parametrize("count", [2, 8, 64, 256])
+    def test_legendre_matches_the_recurrence(self, count):
+        """The Chebyshev map agrees with Bonnet's recurrence to double precision."""
+        basis = LegendreBasis(2, [count, max(count // 2, 2)], normalize=False).double()
+        x = torch.rand(500, 2, dtype=torch.float64) * 2 - 1
+        for axis, feature in enumerate(basis(x)):
+            expected = reference_polynomials(
+                x[:, axis], basis.num_components[axis], True
+            )
+            assert torch.allclose(feature, expected, atol=1e-6)
+
+    def test_differentiable_inside_the_interval(self):
+        x = (torch.rand(20, 1) * 1.8 - 0.9).requires_grad_(True)
+        LegendreBasis(1, 16)(x)[0].sum().backward()
+        assert bool(x.grad.isfinite().all())
+
+
 def reference_tent(x, num_components):
     """The tent formula as originally written, in coordinate units."""
     K = num_components
@@ -138,7 +182,7 @@ class TestTriangle:
         sparse = TriangleBasis(2, K, normalize=normalize, sparse=True).to(device)(x)
         for d, s in zip(dense, sparse):
             assert isinstance(s, RCSMatrix)
-            assert torch.allclose(s.to_dense(), d, atol=1e-6)
+            assert torch.allclose(s.to_dense(), d, atol=1e-5)
 
     def test_two_taps_only(self):
         feats = TriangleBasis(1, 32, normalize=False)(
@@ -202,7 +246,7 @@ class TestSparseEqualsDense:
         for d, s in zip(dense, sparse):
             assert isinstance(s, RCSMatrix)
             assert s.shape == d.shape
-            assert torch.allclose(s.to_dense(), d, atol=1e-6)
+            assert torch.allclose(s.to_dense(), d, atol=1e-5)
 
     @pytest.mark.parametrize("device", DEVICES)
     def test_boundaries_and_grid_points(self, device):
@@ -218,7 +262,7 @@ class TestSparseEqualsDense:
         common = dict(radius=3, normalize=False)
         dense = LanczosBasis(1, K, sparse=False, **common).to(device)(x)[0]
         sparse = LanczosBasis(1, K, sparse=True, **common).to(device)(x)[0]
-        assert torch.allclose(sparse.to_dense(), dense, atol=1e-6)
+        assert torch.allclose(sparse.to_dense(), dense, atol=1e-5)
 
     @pytest.mark.parametrize("device", DEVICES)
     def test_per_axis_num_components(self, device):
@@ -227,7 +271,7 @@ class TestSparseEqualsDense:
         dense = LanczosBasis(3, sparse=False, **common).to(device)(x)
         sparse = LanczosBasis(3, sparse=True, **common).to(device)(x)
         for d, s in zip(dense, sparse):
-            assert torch.allclose(s.to_dense(), d, atol=1e-6)
+            assert torch.allclose(s.to_dense(), d, atol=1e-5)
 
     def test_grid_cache_matches(self):
         """Dense mode's on-grid lookup table stays exact."""

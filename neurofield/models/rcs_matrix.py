@@ -35,7 +35,7 @@ try:
 except ImportError:
     triton = None
 
-__all__ = ["RCSMatrix", "rcs_product"]
+__all__ = ["RCSMatrix", "local_taps", "rcs_product"]
 
 _MATMUL_FUNCS = {
     torch.matmul,
@@ -257,6 +257,64 @@ if triton is not None:
     def _accumulator(dtype: torch.dtype) -> tl.dtype:
         return tl.float64 if dtype == torch.float64 else tl.float32
 
+    @triton.jit
+    def _taps_kernel(
+        x_ptr, sizes_ptr, values_ptr, start_ptr, N,
+        C: tl.constexpr, RADIUS: tl.constexpr, L_P2: tl.constexpr,
+        KERNEL: tl.constexpr, NORMALIZE: tl.constexpr, BLOCK: tl.constexpr,
+    ):  # fmt: skip
+        """The ``2 * RADIUS`` taps around a block of points, on every axis.
+
+        Axis ``c`` of point ``n`` maps to a grid position; the taps start
+        ``RADIUS - 1`` grid steps below it, clamped into the grid, and their
+        values are the kernel at the offsets, L2-normalized when asked:
+        ``KERNEL`` 0 is the triangle, 1 the Lanczos window.
+        """
+        rows = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+        mask = rows < N
+        taps = tl.arange(0, L_P2)
+        live = taps < 2 * RADIUS
+        for c in tl.static_range(C):
+            x = tl.load(x_ptr + rows * C + c, mask=mask, other=0.0)
+            size = tl.load(sizes_ptr + c)
+            position = (x + 1) / 2 * (size - 1)
+            start = tl.floor(position) - (RADIUS - 1)
+            start = tl.minimum(tl.maximum(start, 0.0), size - 2 * RADIUS)
+            t = (position - start)[:, None] - taps[None, :].to(x.dtype)
+            if KERNEL == 0:
+                value = tl.maximum(1 - tl.abs(t), 0.0)
+            else:
+                u = 3.141592653589793 * t
+                sinc = tl.where(u == 0, 1.0, tl.sin(u) / u)
+                window = tl.where(u == 0, 1.0, tl.sin(u / RADIUS) / (u / RADIUS))
+                value = tl.where(tl.abs(t) < RADIUS, sinc * window, 0.0)
+            value = tl.where(live[None, :], value, 0.0)
+            if NORMALIZE:
+                norm = tl.sqrt(tl.sum(value * value, axis=1))
+                value = value / tl.maximum(norm, 1e-12)[:, None]
+            offsets = (rows * C + c)[:, None] * (2 * RADIUS) + taps[None, :]
+            tl.store(values_ptr + offsets, value, mask=mask[:, None] & live[None, :])
+            tl.store(start_ptr + rows * C + c, start.to(tl.int64), mask=mask)
+
+    def local_taps(
+        x: Tensor, sizes: Tensor, radius: int, kernel: int, normalize: bool
+    ) -> tuple[Tensor, Tensor]:
+        """The taps of a local basis at ``(N, C)`` points, in one kernel.
+
+        Returns the ``(N, C, 2 * radius)`` values and the ``(N, C)`` start
+        columns that :class:`RCSMatrix` takes, for the ``sizes`` of the axes.
+        """
+        num_rows, num_axes = x.shape
+        values = x.new_empty(num_rows, num_axes, 2 * radius)
+        start = torch.empty(num_rows, num_axes, dtype=torch.long, device=x.device)
+        block = 128
+        _taps_kernel[(triton.cdiv(num_rows, block),)](
+            x.contiguous(), sizes, values, start, num_rows,
+            C=num_axes, RADIUS=radius, L_P2=triton.next_power_of_2(2 * radius),
+            KERNEL=kernel, NORMALIZE=normalize, BLOCK=block,
+        )  # fmt: skip
+        return values, start
+
     def _launch_product(
         values: Tensor, cols: Tensor, factors: Tensor, width: int
     ) -> Tensor:
@@ -373,6 +431,7 @@ if triton is not None:
             return grad_values, None, *(grad_others or [None] * len(others))
 
 else:
+    local_taps = None
     _RCSProductFn = None
 
 

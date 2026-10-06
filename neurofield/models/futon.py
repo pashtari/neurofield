@@ -34,7 +34,7 @@ from torch import Tensor, nn
 
 from ..utils import ModuleSpec, build_module
 from .mlp import MLP
-from .rcs_matrix import RCSMatrix, rcs_product
+from .rcs_matrix import RCSMatrix, local_taps, rcs_product
 
 __all__ = [
     "CosineBasis",
@@ -224,61 +224,33 @@ class SincBasis(_Basis):
         )
 
 
-class _PolynomialBasis(_Basis):
-    """Polynomials of degrees ``0`` to ``K_c - 1`` from a three-term recurrence.
+def _chebyshev_to_legendre(count: int) -> Tensor:
+    """The ``(count, count)`` matrix ``M`` with ``P_n = sum_k M[n, k] T_k``.
 
-    Subclasses implement :meth:`_recurrence`; ``P_0 = 1`` and ``P_1 = x``.
+    Bonnet's recurrence, :math:`k P_k = (2k - 1) x P_{k-1} - (k - 1) P_{k-2}`,
+    run on Chebyshev coefficients with :math:`x T_j = (T_{j+1} + T_{j-1}) / 2`.
+    The entries are nonnegative and every row sums to one, so the map is as
+    well conditioned as the polynomials themselves.
     """
-
-    def __init__(
-        self,
-        in_features: int,
-        num_components: int | Sequence[int],
-        normalize: bool = True,
-        grid_size: int | Sequence[int] | None = None,
-    ) -> None:
-        super().__init__(in_features, num_components, normalize)
-        self._build_cache(grid_size)
-
-    def _recurrence(self, x: Tensor, prev: Tensor, prev2: Tensor, k: int) -> Tensor:
-        """Return ``P_k`` from ``prev = P_{k-1}`` and ``prev2 = P_{k-2}``."""
-        raise NotImplementedError
-
-    def _evaluate(self, x: Tensor, axis: int) -> Tensor:
-        x = x.unsqueeze(-1)
-        count = self.num_components[axis]
-        polynomials = [torch.ones_like(x), x]  # P_0, P_1
-        for k in range(2, count):
-            polynomials.append(self._recurrence(x, polynomials[-1], polynomials[-2], k))
-        return self._normalize(torch.cat(polynomials[:count], dim=-1))
+    matrix = torch.zeros(count, count, dtype=torch.float64)
+    matrix[0, 0] = 1.0
+    if count > 1:
+        matrix[1, 1] = 1.0
+    for n in range(2, count):
+        previous = matrix[n - 1]
+        times_x = torch.zeros_like(previous)
+        times_x[1:] += previous[:-1] / 2
+        times_x[:-1] += previous[1:] / 2
+        times_x[1] += previous[0] / 2  # x T_0 = T_1
+        matrix[n] = ((2 * n - 1) * times_x - (n - 1) * matrix[n - 2]) / n
+    return matrix.to(torch.get_default_dtype())
 
 
-class LegendreBasis(_PolynomialBasis):
-    r"""Legendre polynomials on ``[-1, 1]``.
-
-    Uses Bonnet's recurrence
-    :math:`k P_k(x) = (2k - 1) x P_{k-1}(x) - (k - 1) P_{k-2}(x)`, giving the
-    standard (unscaled) orthogonal polynomials.
-
-    Args:
-        in_features: Number of coordinate axes ``C``.
-        num_components: Number of polynomials ``K_c``, shared or per axis.
-        normalize: L2-normalize each feature vector.
-        grid_size: Per-axis cache size; see the module notes.
-
-    Shape:
-        - Input: :math:`(*, C)`.
-        - Output: ``C`` tensors of shape :math:`(*, K_c)`.
-    """
-
-    def _recurrence(self, x: Tensor, prev: Tensor, prev2: Tensor, k: int) -> Tensor:
-        return ((2 * k - 1) * x * prev - (k - 1) * prev2) / k
-
-
-class ChebyshevBasis(_PolynomialBasis):
+class ChebyshevBasis(_Basis):
     r"""Chebyshev polynomials of the first kind on ``[-1, 1]``.
 
-    Uses :math:`T_k(x) = 2 x T_{k-1}(x) - T_{k-2}(x)`. The unscaled polynomials
+    Degree ``k`` is :math:`T_k(x) = \cos(k \arccos x)`, so every degree
+    comes from one cosine over a ``(*, K_c)`` grid. The unscaled polynomials
     are orthogonal under the weight :math:`(1 - x^2)^{-1/2}`.
 
     Args:
@@ -292,8 +264,60 @@ class ChebyshevBasis(_PolynomialBasis):
         - Output: ``C`` tensors of shape :math:`(*, K_c)`.
     """
 
-    def _recurrence(self, x: Tensor, prev: Tensor, prev2: Tensor, k: int) -> Tensor:
-        return 2 * x * prev - prev2
+    def __init__(
+        self,
+        in_features: int,
+        num_components: int | Sequence[int],
+        normalize: bool = True,
+        grid_size: int | Sequence[int] | None = None,
+    ) -> None:
+        super().__init__(in_features, num_components, normalize)
+        self._build_cache(grid_size)
+
+    def _polynomials(self, x: Tensor, axis: int) -> Tensor:
+        count = self.num_components[axis]
+        degrees = torch.arange(count, dtype=x.dtype, device=x.device)
+        return torch.cos(degrees * torch.arccos(x.unsqueeze(-1)))
+
+    def _evaluate(self, x: Tensor, axis: int) -> Tensor:
+        return self._normalize(self._polynomials(x, axis))
+
+
+class LegendreBasis(ChebyshevBasis):
+    r"""Legendre polynomials on ``[-1, 1]``.
+
+    Each is a fixed combination of Chebyshev polynomials, with nonnegative
+    coefficients that sum to one, so the basis is the Chebyshev one followed
+    by a matrix product; see :func:`_chebyshev_to_legendre`. The polynomials
+    are the standard, unscaled orthogonal ones.
+
+    Args:
+        in_features: Number of coordinate axes ``C``.
+        num_components: Number of polynomials ``K_c``, shared or per axis.
+        normalize: L2-normalize each feature vector.
+        grid_size: Per-axis cache size; see the module notes.
+
+    Shape:
+        - Input: :math:`(*, C)`.
+        - Output: ``C`` tensors of shape :math:`(*, K_c)`.
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        num_components: int | Sequence[int],
+        normalize: bool = True,
+        grid_size: int | Sequence[int] | None = None,
+    ) -> None:
+        _Basis.__init__(self, in_features, num_components, normalize)
+        matrix = _chebyshev_to_legendre(max(self.num_components))
+        self.register_buffer("_from_chebyshev", matrix, persistent=False)
+        self._build_cache(grid_size)
+
+    def _polynomials(self, x: Tensor, axis: int) -> Tensor:
+        count = self.num_components[axis]
+        matrix = self._from_chebyshev[:count, :count]
+        return super()._polynomials(x, axis) @ matrix.T
 
 
 class _LocalBasis(_Basis):
@@ -302,8 +326,11 @@ class _LocalBasis(_Basis):
     Subclasses implement :meth:`_kernel` on offsets ``t`` measured in grid
     steps. The kernel must vanish for ``|t| >= radius``, so each coordinate
     touches at most ``2 * radius`` consecutive components; sparse mode
-    evaluates only those taps.
+    evaluates only those taps, in one fused kernel on CUDA when the subclass
+    names its kernel in ``_tap_kernel``.
     """
+
+    _tap_kernel: int | None = None  # the kernel's id for :func:`local_taps`
 
     def __init__(
         self,
@@ -341,13 +368,19 @@ class _LocalBasis(_Basis):
         if not self.sparse:
             return super()._features(x)
         # Evaluate the 2 * radius taps around each point, on every axis at once.
-        position = _grid_position(x.reshape(-1, self.in_features), self._sizes)
-        # Clamping keeps each segment inside the basis; taps shifted by the
-        # clamp lie outside the kernel support and evaluate to zero.
-        start = (position.floor() - (self.radius - 1)).clamp_(min=0)
-        start = start.minimum(self._sizes - 2 * self.radius)
-        t = (position - start).unsqueeze(-1) - self._taps
-        values, start = self._normalize(self._kernel(t)), start.long()
+        x = x.reshape(-1, self.in_features)
+        if x.is_cuda and local_taps is not None and self._tap_kernel is not None:
+            values, start = local_taps(
+                x, self._sizes, self.radius, self._tap_kernel, self.normalize
+            )
+        else:
+            position = _grid_position(x, self._sizes)
+            # Clamping keeps each segment inside the basis; taps shifted by
+            # the clamp lie outside the kernel support and evaluate to zero.
+            start = (position.floor() - (self.radius - 1)).clamp_(min=0)
+            start = start.minimum(self._sizes - 2 * self.radius)
+            t = (position - start).unsqueeze(-1) - self._taps
+            values, start = self._normalize(self._kernel(t)), start.long()
         # The clamp keeps the segments in bounds, so skip the synchronizing check.
         return tuple(
             RCSMatrix(values[:, axis], start[:, axis], size, check_invariants=False)
@@ -390,6 +423,8 @@ class TriangleBasis(_LocalBasis):
     ) -> None:
         super().__init__(in_features, num_components, 1, normalize, grid_size, sparse)
 
+    _tap_kernel = 0
+
     def _kernel(self, t: Tensor) -> Tensor:
         return (1.0 - t.abs()).clamp(min=0.0)
 
@@ -431,6 +466,8 @@ class LanczosBasis(_LocalBasis):
         super().__init__(
             in_features, num_components, radius, normalize, grid_size, sparse
         )
+
+    _tap_kernel = 1
 
     def _kernel(self, t: Tensor) -> Tensor:
         return torch.where(

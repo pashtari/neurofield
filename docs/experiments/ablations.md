@@ -8,11 +8,11 @@ All six families at the default size. The number of parameters does not depend o
 
 | Basis | Orthogonal | Support | Smoothness | Train time (s) ↓ | PSNR (dB) ↑ |
 | --- | --- | --- | --- | --- | --- |
-| Cosine | yes | global | $C^\infty$ | 8.4 | *38.36* ± 0.05 |
-| Chebyshev | weighted | global | $C^\infty$ | 37.9 | 37.52 ± 0.05 |
-| Legendre | yes | global | $C^\infty$ | 58.9 | 37.41 ± 0.05 |
-| Triangle | no | compact | $C^0$ | **5.9** | 37.53 ± 0.05 |
-| Lanczos | no | compact | $C^1$ | *6.6* | 38.20 ± 0.04 |
+| Cosine | yes | global | $C^\infty$ | 8.4 | *38.36* ± 0.04 |
+| Chebyshev | weighted | global | $C^\infty$ | 8.6 | 37.52 ± 0.05 |
+| Legendre | yes | global | $C^\infty$ | 10.8 | 37.42 ± 0.05 |
+| Triangle | no | compact | $C^0$ | **5.4** | 37.54 ± 0.05 |
+| Lanczos | no | compact | $C^1$ | *5.7* | 38.22 ± 0.03 |
 | Sinc | no | global | $C^\infty$ | 8.3 | **38.54** ± 0.04 |
 
 <figure markdown="span">
@@ -20,7 +20,7 @@ All six families at the default size. The number of parameters does not depend o
   <figcaption>PSNR against training time for every basis.</figcaption>
 </figure>
 
-The families fall into two groups a decibel apart, and that is the whole spread: sinc, cosine and Lanczos at 38.2 to 38.5 dB, triangle and the two polynomial families at 37.4 to 37.5. Training time varies 10×. The cosine and sinc bases are tabulated on the pixel grid (`grid_size = (H, W)`); the polynomial families are evaluated at every step by a three-term recurrence, which is what makes them slow, and buy no accuracy for it; the local ones are fast because a coordinate touches two (triangle) or six (Lanczos-3) functions per axis, which the fused sparse kernels exploit. Lanczos is the sweet spot, 0.3 dB behind sinc in 80 % of its time, and triangle, the cheapest, pays a full decibel for its $C^0$ kink.
+The families fall into two groups a decibel apart, and that is the whole spread: sinc, cosine and Lanczos at 38.2 to 38.5 dB, triangle and the two polynomial families at 37.4 to 37.5. Training time varies 2×. The cosine and sinc bases are tabulated on the pixel grid (`grid_size = (H, W)`); the Chebyshev polynomials are one cosine over the degrees and the Legendre ones a fixed combination of them, so the global families cost about the same; the local ones are the cheapest because a coordinate touches two (triangle) or six (Lanczos-3) functions per axis, which one fused kernel evaluates and the sparse product kernels exploit. Lanczos is the sweet spot, 0.3 dB behind sinc in 70 % of its time, and triangle, the cheapest, pays a full decibel for its $C^0$ kink.
 
 ## Components against rank
 

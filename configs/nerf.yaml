@@ -33,13 +33,13 @@ models:
       hidden_features: 180
       hidden_layers: 2
       num_frequencies: 90
-      sigma: 8.0
-    train: {lr: 3.0e-3}  # 1e-2 costs 1.7 dB on ship
+      sigma: 2.0  # tuned on drums and lego: 8 loses 4 dB, 4 and 1 about 0.3
+    train: {lr: 3.0e-3}  # 1e-2 costs 0.2 dB on the same scenes
 
   PE-MLP:
     class: PEMLP
     kwargs:
-      hidden_features: 180
+      hidden_features: 166  # 75,143 parameters in all; 180 overshot the budget by 15%
       hidden_layers: 3
       num_frequencies: 10
     train: {lr: 1.0e-2}

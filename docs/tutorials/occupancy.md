@@ -18,7 +18,7 @@ eval_set.input.shape, eval_set.target.shape   # (D, H, W, 3) coordinates, (D, H,
 eval_set.original.shape                        # (1, D, H, W) float occupancy in {0, 1}
 ```
 
-At $256^3$ resolution a volume has up to 16.8 million voxels; `subsample=0.01` trains on a random 1 % of them per step. The five meshes of the benchmark are the Stanford armadillo, dragon, happy buddha, lucy and thai statue, fetched by `scripts/download_meshes.py`.
+At 256 samples per unit length a volume, cropped to the shape's bounds, holds 2 to 8 million voxels; `subsample=0.01` trains on a random 1 % of them per step. The five meshes of the benchmark are the Stanford armadillo, dragon, happy buddha, lucy and thai statue, fetched by `scripts/download_meshes.py`.
 
 ## Model
 

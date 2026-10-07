@@ -85,7 +85,9 @@ def train(
     Returns:
         Dict with ``"config"``, ``"model_dict"`` (the field's final state dict),
         and ``"history"``. Configuration records model, optimizer, dataset,
-        renderer, and seed settings, plus ``skipped_steps``. Each history entry
+        renderer, and seed settings, plus ``skipped_steps`` and ``peak_memory``,
+        the most bytes a training step allocated beyond the data, field and
+        occupancy grid already on the device (zero off CUDA). Each history entry
         contains ``step``, training-only ``elapsed`` seconds, ``loss``, training
         ``psnr``, and ``num_samples``; evaluation steps also contain mean held-out
         metrics under ``eval``.
@@ -147,8 +149,13 @@ def train(
     elapsed = 0.0
     skipped_steps = 0
     progress = tqdm(range(1, num_steps + 1), desc="Training")
+    cuda = device.type == "cuda"
+    resident = torch.cuda.memory_allocated(device) if cuda else 0
+    peak_memory = 0
 
     for step in progress:
+        if cuda:  # each step's own peak, so that evaluations are left out
+            torch.cuda.reset_peak_memory_stats(device)
         start_time = time.time()
 
         # Step zero initializes nerfacc's initially empty occupancy grid.
@@ -176,9 +183,12 @@ def train(
             skipped_steps += 1
         scheduler.step()
 
-        if device.type == "cuda":
+        if cuda:
             torch.cuda.synchronize(device)
         elapsed += time.time() - start_time
+        if cuda:
+            peak = torch.cuda.max_memory_allocated(device) - resident
+            peak_memory = max(peak_memory, peak)
 
         should_log = (log_interval > 0 and step % log_interval == 0) or (
             step == num_steps
@@ -232,6 +242,7 @@ def train(
             stacklevel=2,
         )
     config["skipped_steps"] = skipped_steps
+    config["peak_memory"] = peak_memory
 
     if log_dir:
         checkpoint_path = os.path.join(log_dir, "checkpoint.pt")

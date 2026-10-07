@@ -129,6 +129,7 @@ def test_dip_training_keeps_data_on_device(device):
     )
 
     assert len(results["history"]) == 4
+    assert (results["config"]["peak_memory"] > 0) == (device == "cuda")
     assert dataset.input.device.type == dataset.target.device.type == device
     assert dataset.original.device.type == "cpu"
 

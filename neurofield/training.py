@@ -49,6 +49,10 @@ def train_epoch(
 ) -> dict[str, Any]:
     """Run one training epoch, returning the last batch's metrics and ID.
 
+    The result also holds ``peak_memory``: the most bytes a step allocated
+    beyond what was on the device when the epoch began, with drawing its batch
+    left out (zero off CUDA).
+
     Tensor entries without an underscore-prefixed key are moved to ``device``.
     ``loss_fn(batch, model)`` returns a scalar loss and float metrics. Optimizer
     and scheduler each step once per batch. A block coordinate descent solver,
@@ -63,12 +67,17 @@ def train_epoch(
 
     last_metrics: dict[str, Any] = {}
     last_id: Any = None
+    cuda = torch.device(device).type == "cuda"
+    resident = torch.cuda.memory_allocated(device) if cuda else 0
+    peak_memory = 0
 
     for batch in dataloader:
         last_id = batch.get("id")
         for key, value in batch.items():
             if isinstance(value, Tensor) and not key.startswith("_"):
                 batch[key] = value.to(device)
+        if cuda:  # the step's own peak, apart from drawing the batch
+            torch.cuda.reset_peak_memory_stats(device)
 
         if isinstance(optimizer, BCD):
             loss = optimizer.step(batch)
@@ -79,10 +88,13 @@ def train_epoch(
             loss.backward()
             optimizer.step()
         scheduler.step()
+        if cuda:
+            peak = torch.cuda.max_memory_allocated(device) - resident
+            peak_memory = max(peak_memory, peak)
 
         last_metrics = metrics
 
-    return {"id": last_id, **last_metrics}
+    return {"id": last_id, **last_metrics, "peak_memory": peak_memory}
 
 
 def train(
@@ -158,7 +170,10 @@ def train(
         seed: Seed for the global PyTorch RNG.
 
     Returns:
-        ``config`` with logged settings, ``model_dict`` with final parameters
+        ``config`` with logged settings and ``peak_memory``, the most bytes a
+        training step allocated beyond the data and parameters already on the
+        device, drawing its batch and evaluations left out (zero off CUDA),
+        ``model_dict`` with final parameters
         (integer codes and scales when quantized), and ``history`` with one
         record per logged epoch. Records contain last-batch training metrics
         and averaged evaluation metrics under ``eval`` when evaluated.
@@ -249,6 +264,7 @@ def train(
     history: list[dict[str, Any]] = []
 
     elapsed_time = 0.0
+    peak_memory = 0
     for epoch in progress_bar:
         epoch_start_time = time.time()
 
@@ -269,6 +285,7 @@ def train(
             torch.cuda.synchronize(device)
         epoch_duration = time.time() - epoch_start_time
         elapsed_time += epoch_duration
+        peak_memory = max(peak_memory, epoch_results.pop("peak_memory"))
 
         results = {
             "epoch": epoch,
@@ -322,6 +339,8 @@ def train(
             history.append(results)
 
     logger.info("Training completed")
+    logger.info("Peak training memory: %.1f MB", peak_memory / 1e6)
+    config["peak_memory"] = peak_memory
 
     if quantize:
         model, model_dict = uniform_quantize(model, quant_max)

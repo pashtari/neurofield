@@ -15,7 +15,9 @@ Usage:
     python scripts/profile_speed.py --tasks image occupancy --repeats 9
 
 Writes logs/speed/<task>.json: each model's median inference time over the
-repeats, the points it evaluated, and the rate those give.
+repeats, the points it evaluated, the rate those give, and the most memory one
+inference allocated beyond the model and its input. Memory needs no exclusive
+node, so a shared job can write it elsewhere with --out-dir logs/memory.
 """
 
 import argparse
@@ -31,7 +33,8 @@ from report_paper import field_and_renderer
 
 import neurofield as nf
 
-CHUNK = 262_144  # coordinates per forward pass, as configs/occupancy.yaml uses
+CHUNK = 262_144  # coordinates per forward pass, as configs/occupancy.yaml and
+# configs/super_resolution.yaml evaluate them
 
 
 def timed(call: Callable[[], object], repeats: int) -> float:
@@ -46,13 +49,28 @@ def timed(call: Callable[[], object], repeats: int) -> float:
     return statistics.median(durations[2:])
 
 
-def image_inference(run: dict, path: Path, device) -> tuple[Callable, int]:
-    """Render the whole image from its coordinates, as the benchmark scores it."""
+def peak_memory(call: Callable[[], object], device: torch.device) -> int:
+    """Bytes a call allocates at its peak beyond what is already on the device."""
+    torch.cuda.synchronize(device)
+    torch.cuda.reset_peak_memory_stats(device)
+    resident = torch.cuda.memory_allocated(device)
+    call()
+    torch.cuda.synchronize(device)
+    return torch.cuda.max_memory_allocated(device) - resident
+
+
+def image_inference(
+    run: dict, path: Path, device, chunk_size: int | None = None
+) -> tuple[Callable, int]:
+    """Render the image from its coordinates, as the benchmark scores it: the
+    Kodak images in one pass, and the DIV2K ones in chunks of CHUNK pixels."""
     dataset = nf.ImageCoordinateDataset(path)
     model = report.load_model(run, 2, 3, device)
     coords = dataset.input.to(device)
     return (
-        lambda: nf.chunked_inference(model, coords, device=device),
+        lambda: nf.chunked_inference(
+            model, coords, chunk_size=chunk_size, device=device
+        ),
         coords[..., 0].numel(),
     )
 
@@ -99,7 +117,7 @@ def super_resolution_inference(run: dict, path: Path, device) -> tuple[Callable,
     not timed here, their own evaluation already times PIL alone.
     """
     if run["setup"].get("class") != "DIPSkip":
-        return image_inference(run, path, device)
+        return image_inference(run, path, device, CHUNK)
     model, noise = report.load_dip(run, path, device)
     noise = noise.to(device)
     return (
@@ -151,15 +169,18 @@ def main() -> None:
         measured = {}
         for run in sorted(runs, key=lambda run: run["model"]):
             call, points = INFERENCE[task](run, path, device)
+            memory = peak_memory(call, device)
             seconds = timed(call, args.repeats)
             measured[run["model"]] = {
                 "seconds": seconds,
                 "points": points,
                 "rate": points / seconds,
+                "memory": memory,
             }
             print(
                 f"  {run['model']:14} {1000 * seconds:8.1f} ms"
-                f"  {points / seconds / 1e6:7.2f} M{UNITS[task]}/s",
+                f"  {points / seconds / 1e6:7.2f} M{UNITS[task]}/s"
+                f"  {memory / 1e6:8.1f} MB",
                 flush=True,
             )
             torch.cuda.empty_cache()

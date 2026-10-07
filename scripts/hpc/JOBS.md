@@ -136,6 +136,25 @@ sbatch $common --time=0:30:00 --job-name=nf-speed-sr --wrap \
   "source $VSC_DATA/venvs/neurofield-env/bin/activate && python scripts/profile_speed.py --tasks super_resolution"
 ```
 
+Peak memory is a property of the process, not of the node, so one shared job
+measures it on each task's profiled signal: every training run records the
+most a step allocated beyond the data and parameters already on the GPU, and
+a short run reaches that peak (the radiance fields early, while the occupancy
+grid is still dense), and `profile_speed.py` records the peak of each
+inference. Both land in `logs/memory/`, apart from the clean timings, and the
+report takes the memory columns and figures from there.
+
+```bash
+shared="--clusters=accelgor --gpus-per-node=1 --chdir=$VSC_DATA/projects/neurofield --output=logs/slurm/%x-%j.out"
+sbatch $shared --time=2:00:00 --job-name=nf-memory --wrap \
+  "source $VSC_DATA/venvs/neurofield-env/bin/activate \
+   && python scripts/train_image.py --data data/Kodak/kodim01.png --set train.num_epochs=100 --overwrite --log-dir logs/memory/image \
+   && python scripts/train_occupancy.py --data data/occupancy/thai_statue.ply --set train.num_epochs=100 --overwrite --log-dir logs/memory/occupancy \
+   && python scripts/train_nerf.py --data data/nerf/blender/lego --set train.num_steps=2500 --overwrite --log-dir logs/memory/nerf \
+   && python scripts/train_super_resolution.py --data data/DIV2K/DIV2K_valid_HR/0882.png --set train.num_epochs=100 --overwrite --log-dir logs/memory/super_resolution \
+   && python scripts/profile_speed.py --out-dir logs/memory"
+```
+
 `report_paper.py` writes everything the paper needs into `results/`, and
 nothing else. Per task, in `results/<task>/` so that each is a LaTeX
 subfigure:

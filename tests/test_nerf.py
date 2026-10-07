@@ -200,4 +200,5 @@ def test_train_loop_runs_and_loss_is_finite():
     )
 
     assert result["config"]["skipped_steps"] == 0
+    assert (result["config"]["peak_memory"] > 0) == (device == "cuda")
     assert math.isfinite(result["history"][-1]["loss"])

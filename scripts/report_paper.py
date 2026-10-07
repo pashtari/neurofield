@@ -12,7 +12,10 @@ Writes results/, which holds the paper's figures and tables and nothing else:
     <task>/tradeoff.{pdf,pgf}        every model's final quality against its
                                      training time
     <task>/throughput.{pdf,pgf}      the same against its inference rate
-    <task>/table.{tex,md}            every model's size, training time and final
+    <task>/memory_training.{pdf,pgf}   the same against its peak training memory
+    <task>/memory_inference.{pdf,pgf}  and against its peak inference memory
+    <task>/table.{tex,md}            every model's size, training time, peak
+                                     training and inference memory and final
                                      metrics, the averages with a paired standard
                                      error: occupancy adds every shape's IoU, and
                                      NeRF every scene's metrics under a super column
@@ -433,6 +436,36 @@ def profiled(final: pd.DataFrame, task: str) -> pd.DataFrame:
     return final.assign(speed=final["model"].map(rates).fillna(final["speed"]))
 
 
+def measured_memory(final: pd.DataFrame, task: str) -> pd.DataFrame:
+    """Each model's peak memory of training and of inference, in MB.
+
+    logs/memory/<task>/ holds a short run of every model on the profiled
+    signal, long enough for a training step to reach its peak, and
+    logs/memory/<task>.json scripts/profile_speed.py's inference of that signal.
+    Both record the most a step or an inference allocated beyond the data and
+    parameters already on the device. One signal stands for all, since the
+    protocol fixes every batch and a scene only changes how many samples its
+    rays keep.
+    """
+    directory = ROOT / "logs" / "memory"
+
+    def name(model: str) -> str:
+        return "TensoRF" if model == TENSORF[task] else model
+
+    training = {  # the interpolations train nothing, so they record no peak
+        name(run["model"]): run["peak_memory"]
+        for run in read(directory / task, task)
+        if "peak_memory" in run
+    }
+    path = directory / f"{task}.json"
+    profile = json.loads(path.read_text()) if path.exists() else {}
+    inference = {name(model): entry["memory"] for model, entry in profile.items()}
+    return final.assign(
+        train_memory=final["model"].map(training) / 1e6,
+        infer_memory=final["model"].map(inference) / 1e6,
+    )
+
+
 def load(task: str) -> tuple[list[dict[str, Any]], pd.DataFrame, pd.DataFrame]:
     """A task's runs, its final metrics and its curves, with one TensoRF."""
     others = {"TensoRF", "TensoRF-CP", "TensoRF-VM"} - {TENSORF[task]}
@@ -443,7 +476,7 @@ def load(task: str) -> tuple[list[dict[str, Any]], pd.DataFrame, pd.DataFrame]:
         for run in timed(runs, task)
         if run["model"] not in others
     ]
-    return runs, profiled(results(runs), task), curves(runs)
+    return runs, measured_memory(profiled(results(runs), task), task), curves(runs)
 
 
 def model_config(run: dict[str, Any]) -> dict[str, Any]:
@@ -637,7 +670,8 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
 
 
 def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
-    """Each model's final quality against its training time or inference rate.
+    """Each model's final quality against a cost: training time, inference rate,
+    or peak training or inference memory.
 
     Both axes are linear: the models lie within a decade of each other, where
     a log axis would only cost the reader the plain reading of the distances.
@@ -648,6 +682,8 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
     axis = {
         "time": r"Training time (s)$\,\downarrow$",
         "speed": rf"Inference ({SPEED[task]})$\,\uparrow$",
+        "train_memory": r"Training memory (MB)$\,\downarrow$",
+        "infer_memory": r"Inference memory (MB)$\,\downarrow$",
     }[cost]
     means = final.groupby("model")[[cost, metric]].mean()
     # The interpolations take no training: they set the reference level, not a point.
@@ -673,7 +709,8 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
     # Explicit limits, so that the pair of figures shares a quality axis and
     # no marker touches a spine.
     plot.set(xlim=padded(trained[cost]), xlabel=axis, ylabel=label)
-    plot.xaxis.set_major_locator(MaxNLocator(5))
+    # Memory runs to five digits, which only four ticks leave room for.
+    plot.xaxis.set_major_locator(MaxNLocator(4 if "memory" in cost else 5))
     low, high = padded(trained[metric])
     if task in BOTTOM:
         low = BOTTOM[task]
@@ -821,8 +858,14 @@ def tables(final: pd.DataFrame, task: str) -> dict[str, str]:
     """
     metrics = TASKS[task][2]
     # The size and training time every table opens with, as TensoRF, K-Planes
-    # and NeuRBF report them; the inference rate stays in the throughput plot.
-    spec = {"parameters": PARAMS, "time": ("", "Train time (s)", False, 1)}
+    # and NeuRBF report them, and the peak memory of training and inference;
+    # the inference rate stays in the throughput plot.
+    spec = {
+        "parameters": PARAMS,
+        "time": ("", "Train time (s)", False, 1),
+        "train_memory": ("Memory (MB)", "Train", False, 0),
+        "infer_memory": ("Memory (MB)", "Inference", False, 0),
+    }
     values = final.groupby("model")[list(spec)].mean()
     # Interpolations have no parameters and train nothing, so neither column
     # applies to them, nor should they top its ranking.
@@ -1554,6 +1597,8 @@ def main() -> None:
         save(convergence(curve, task), out_dir / task / "convergence")
         save(tradeoff(final, task), out_dir / task / "tradeoff")
         save(tradeoff(final, task, "speed"), out_dir / task / "throughput")
+        save(tradeoff(final, task, "train_memory"), out_dir / task / "memory_training")
+        save(tradeoff(final, task, "infer_memory"), out_dir / task / "memory_inference")
         for signal in [] if args.no_panels else args.signals or EXAMPLES[task]:
             directory = panels(task, signal, runs, args.device, args.overwrite)
             if args.orbit and task == "nerf":

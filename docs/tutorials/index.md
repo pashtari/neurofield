@@ -9,4 +9,4 @@ Each tutorial is a complete, runnable workflow for one task, using the same sett
 | [Radiance fields](nerf.md) | Any model as the density network of a NeRF, trained on posed views, rendered in orbit | a Blender scene |
 | [Image compression](compression.md) | FUTON as a codec: rate-distortion training, quantization, bits per pixel | an image |
 | [Custom components](custom-components.md) | Your own basis, combiner, decoder, loss, metric and dataset | nothing |
-| [Notebooks](notebooks.md) | The four benchmark notebooks and how to run them | the data |
+| [Notebooks](notebooks.md) | The five notebooks and how to run them | the data |

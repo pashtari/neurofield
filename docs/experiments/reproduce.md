@@ -87,8 +87,9 @@ results/
 ├── legend.{pdf,pgf}                 the models' legend, shared by every figure
 ├── <task>/convergence.{pdf,pgf}     quality against training time, FUTON and the strongest model of each family
 ├── <task>/tradeoff.{pdf,pgf}        every model's final quality against its training time
-├── <task>/throughput.{pdf,pgf}      the same against its inference rate
-├── <task>/table.{tex,md}            size, training time and final metrics, best in bold, second underlined
+├── <task>/throughput.{pdf,pgf}      the same against its inference throughput
+├── <task>/memory_{training,inference}.{pdf,pgf}  and against its peak memory in either phase
+├── <task>/table.{tex,md}            size, the cost of both phases and final metrics, every shape's and scene's too, best in bold, second underlined
 ├── <task>/qualitative_<signal>.pdf  the signal with two regions boxed and magnified for every featured model (bicubic for TensoRF in super-resolution)
 ├── <task>/panels/<signal>/          the renders those magnifications are cut from, rebuilt from the checkpoints
 └── ablation/                        a table and a convergence plot each for the bases, the combiners and the decoders, and PSNR against each fraction
@@ -101,7 +102,7 @@ python scripts/report_paper.py --no-panels              # tables and plots only,
 python scripts/report_paper.py --orbit 60               # plus an orbit GIF of each NeRF model
 ```
 
-The magnified regions are found, not chosen: the two squares of fine detail where FUTON gains most squared error over the strongest baseline. Drawing the panels needs the signals in `data/` and a GPU; they are kept and reused, so recomposing a figure costs seconds. Figures come as PDF and as PGF for LaTeX. The `±` in the tables is a paired standard error over the signals: each signal's own level is removed before the error is taken, which is the uncertainty of a comparison between models rather than of an absolute level.
+The magnified regions are found, not chosen: the two squares of fine detail where FUTON gains most squared error over the strongest baseline. Drawing the panels needs the signals in `data/` and a GPU; they are kept and reused, so recomposing a figure costs seconds. Figures come as PDF and as PGF for LaTeX, sized for a NeurIPS page: a plot is a third of the 5.5-inch text width, a strip of magnifications spans it, text runs from 6.5 to 8 pt, and every tick falls on a whole or half number. The image and super-resolution tables fit the text width in 9 pt type; the occupancy and NeRF ones, with every shape's and scene's scores, are wider and take a page turned sideways. The `±` in the tables is a paired standard error over the signals: each signal's own level is removed before the error is taken, which is the uncertainty of a comparison between models rather than of an absolute level; IoU, which saturates near 100 % on every shape, takes the plain standard error over the shapes. A band in a figure spans one of them, the same error.
 
 Timings recorded during a sweep carry whatever else shared the node: retrained alone on an exclusive node, Instant-NGP was 1.7× faster, MFN and TensoRF-VM 1.2×, the other models within a few percent. The report therefore takes accuracy from the sweeps and times from separate exclusive jobs, the recipe in `scripts/hpc/JOBS.md`: `scripts/profile_speed.py` times every model's inference on one signal per task and writes `logs/speed/<task>.json`, which the throughput figure reads, and the same training scripts rerun every model into `logs/timing/<task>/`, after a warm-up pass that keeps kernel compilation out of the clock. Wherever a timing run exists, its times replace the sweep's in the tables and figures while the metrics stay the sweep's (they agree where training is deterministic), and the mean training time is taken over the timed signals: every image and shape, the lego and hotdog scenes, and DIV2K images 0801 and 0882.
 

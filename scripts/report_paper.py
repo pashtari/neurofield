@@ -11,14 +11,15 @@ Writes results/, which holds the paper's figures and tables and nothing else:
                                      the strongest model of each other family
     <task>/tradeoff.{pdf,pgf}        every model's final quality against its
                                      training time
-    <task>/throughput.{pdf,pgf}      the same against its inference rate
+    <task>/throughput.{pdf,pgf}      the same against its inference throughput
     <task>/memory_training.{pdf,pgf}   the same against its peak training memory
     <task>/memory_inference.{pdf,pgf}  and against its peak inference memory
-    <task>/table.{tex,md}            every model's size, training time, peak
-                                     training and inference memory and final
-                                     metrics, the averages with a paired standard
-                                     error: occupancy adds every shape's IoU, and
-                                     NeRF every scene's metrics under a super column
+    <task>/table.{tex,md}            every model's size, training time and peak
+                                     memory, inference throughput and peak memory,
+                                     and final metrics, the averages with a paired
+                                     standard error: occupancy adds every shape's
+                                     IoU, and NeRF every scene's metrics under a
+                                     super column
     <task>/qualitative_<signal>.pdf  the signal with two regions boxed, and those
                                      regions magnified for the ground truth and
                                      every featured model (for super-resolution,
@@ -35,6 +36,11 @@ Writes results/, which holds the paper's figures and tables and nothing else:
     ablation/beta_<basis>.{pdf,pgf}  PSNR against the rank fraction at each
                                      component fraction, and alpha_<basis> the
                                      reverse, for the fractions 1/4 to 2
+
+Everything is sized for a NeurIPS page, 5.5 inches of 10pt Times: a panel is a
+third of the text width, a strip of magnifications spans it, and the image and
+super-resolution tables fit it in small type. Ticks fall on whole or half
+numbers, and a band spans one standard error either side, as a table's ± does.
 
 Tables mark the best value in bold and the second underlined. Drawing the panels
 needs the signals in data/ and a GPU; --no-panels leaves them out, and
@@ -72,8 +78,7 @@ from matplotlib.textpath import TextPath
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import (
     FixedLocator,
-    MaxNLocator,
-    MultipleLocator,
+    Locator,
     NullFormatter,
     NullLocator,
     StrMethodFormatter,
@@ -88,15 +93,15 @@ import neurofield as nf
 # and the decimals of a table entry.
 METRICS = {
     "psnr": ("PSNR (dB)", True, 1, 2),
-    "ssim": ("SSIM (%)", True, 100, 2),
-    "lpips": ("LPIPS", False, 1, 4),
+    "ssim": ("SSIM", True, 1, 3),
+    "lpips": ("LPIPS", False, 1, 3),
     "iou": ("IoU (%)", True, 100, 2),
 }
-SPEED = {
-    "image": "img/s",
-    "occupancy": "vol/s",
-    "nerf": "views/s",
-    "super_resolution": "img/s",
+SPEED = {  # the unit of each task's inference throughput
+    "image": "MPix/s",
+    "occupancy": "MVox/s",
+    "nerf": "FPS",
+    "super_resolution": "MPix/s",
 }
 SIGNALS = {  # where a task's signal lives
     "image": "data/Kodak/{}.png",
@@ -198,8 +203,21 @@ FLOOR = {"occupancy": 99.0}
 # it is drawn as a marker on the axis line.
 BOTTOM = {"super_resolution": 26.0}
 TARGET = 99.8  # IoU (%) whose first time the text quotes
-SIZE = (2.3, 1.9)  # inches, a third of a two-column page with gutters
-WIDTH = 7.0  # inches, a two-column figure
+# NeurIPS's page is 5.5 inches wide and set in 10pt Times. Every figure is
+# drawn at the size it is printed, so that its text keeps its size there.
+WIDTH = 5.5  # inches, the text width, which a strip of magnifications spans
+SIZE = (1.75, 1.45)  # inches, a panel: three and their two gutters span the text
+# A band spans this many standard errors either side of the mean: one, the
+# ± of the tables, which every caption states, as NeurIPS asks.
+BAND = 1
+# The metrics whose errors are taken within signal: PSNR, SSIM and LPIPS shift
+# with the image or scene, alike for every model, and that shift is removed.
+# IoU saturates near 100% on every shape, so the shapes share no level, and
+# removing one would only lend the strongest models the weakest ones' spread.
+PAIRED = {"psnr", "ssim", "lpips"}
+# The type size and column gap of every table: NeurIPS's small, 9pt, at which
+# the image and super-resolution tables, nine columns, fit the text.
+TABLE_SIZE, TABLE_GAP = r"\small", "4pt"
 
 # One colour per magnified region, so that a box and the row it magnifies are
 # read together: the red of the super-resolution literature, and a cyan that
@@ -213,8 +231,11 @@ SIDES = {"image": 0.075, "occupancy": 0.14, "nerf": 0.20, "super_resolution": 0.
 # The magnifications' titles and scores: the largest size they are set at, and
 # the inches kept above the panels for the titles and below for the scores. A
 # talk raises both before drawing; the paper keeps them.
-LABEL_SIZE = 6.5
+LABEL_SIZE = 7.0
 LABEL_ROOM = (0.17, 0.19)
+# The smallest a title is set at, between NeurIPS's tiny and scriptsize: a wide
+# reference is drawn narrower rather than let the titles shrink below it.
+LABEL_FLOOR = 6.5
 # The widest a reference is drawn, as an aspect ratio: a wider one is scaled
 # down and centred on the rows, so that a panorama does not squeeze the
 # magnifications. None draws every reference at the full height of the rows,
@@ -249,9 +270,10 @@ DECODERS = {
 }
 # The fractions the grid figures draw: the 1/8 level only compresses the axis.
 SHOWN = (0.25, 0.5, 1.0, 2.0)
-# Where a study's legend goes when "best" would still cover a curve.
-LEGEND_LOC = {"decoder": "upper left"}
-PARAMS = ("", "# Params (k)", None, 1)  # the column every table opens with
+# The room an ablation figure adds above its plot per row of its legend, in
+# inches, so that its plot is as large as a benchmark panel's.
+LEGEND_ROW = 0.15
+PARAMS = ("", "#Params (K)", None, 1)  # the column every table opens with
 DASHES = ("", (4, 2), (1, 1.5))  # solid, dashed, dotted
 # The convergence of the three studies that get a curve, as label, colour and
 # dashes per model: a hue names the choice under study and the dashes the basis
@@ -283,30 +305,50 @@ CURVES = {
 
 
 def style() -> None:
-    """One look for every figure.
+    """One look for every figure, at the sizes it is printed at.
 
-    Sizes are final, since a PGF figure is included as it is, and with
-    ``pgf.rcfonts`` off the text takes the document's own font.
+    A PGF figure is included as it is, and with ``pgf.rcfonts`` off its text
+    takes the document's Times. The PDFs set STIX, the Times that ships with
+    matplotlib, so that every machine draws them alike, embedded as TrueType,
+    since NeurIPS takes no Type 3 fonts. Text runs from the page's scriptsize
+    to its footnotesize, under the 10pt of the body: 7pt for tick labels and
+    legends, 8pt for axis labels. Lines and ticks thin to match.
     """
     sns.set_theme(style="ticks", context="paper")
     plt.rcParams.update(
         {
-            "figure.figsize": (5.5, 3.4),
+            "figure.figsize": SIZE,
             "figure.constrained_layout.use": True,
+            "font.family": "serif",
+            "font.serif": ["STIXGeneral"],
+            "mathtext.fontset": "stix",
+            "font.size": 8,
+            "axes.labelsize": 8,
+            "axes.titlesize": 8,
+            "xtick.labelsize": 7,
+            "ytick.labelsize": 7,
+            "legend.fontsize": 7,
+            "legend.title_fontsize": 7,
+            "legend.handlelength": 1.6,
             "axes.grid": True,
             "grid.alpha": 0.25,
-            "grid.linewidth": 0.5,
+            "grid.linewidth": 0.4,
             "axes.spines.top": False,
             "axes.spines.right": False,
-            "axes.linewidth": 0.8,
-            "font.size": 9,
-            "axes.labelsize": 10,
-            "axes.titlesize": 10,
-            "xtick.labelsize": 9,
-            "ytick.labelsize": 9,
-            "legend.fontsize": 7,
-            "legend.handlelength": 1.6,
-            "lines.linewidth": 1.5,
+            "axes.linewidth": 0.6,
+            "axes.labelpad": 2.0,
+            "xtick.major.size": 2.5,
+            "ytick.major.size": 2.5,
+            "xtick.major.width": 0.6,
+            "ytick.major.width": 0.6,
+            "xtick.minor.size": 1.5,
+            "ytick.minor.size": 1.5,
+            "xtick.minor.width": 0.4,
+            "ytick.minor.width": 0.4,
+            "xtick.major.pad": 2.0,
+            "ytick.major.pad": 2.0,
+            "lines.linewidth": 1.2,
+            "pdf.fonttype": 42,
             "pgf.texsystem": "pdflatex",
             "pgf.rcfonts": False,
             "savefig.pad_inches": 0.02,
@@ -336,7 +378,7 @@ def read(log_dir: Path, task: str) -> list[dict[str, Any]]:
 
 
 def scale(metric: str, value: float) -> float:
-    """A stored value as it is reported, e.g. IoU and SSIM as percentages."""
+    """A stored value as it is reported, e.g. IoU as a percentage."""
     return value * METRICS[metric][2]
 
 
@@ -349,8 +391,6 @@ def results(runs: list[dict[str, Any]]) -> pd.DataFrame:
             "model": run["model"],
             "parameters": run["num_params"] / 1000,
             "time": run["train_time"],
-            # Evaluating one signal, so its reciprocal is the inference rate.
-            "speed": 1 / run["metrics"]["duration"],
         }
         row |= {
             metric: scale(metric, value)
@@ -420,24 +460,26 @@ def timed(runs: list[dict[str, Any]], task: str) -> list[dict[str, Any]]:
 
 
 def profiled(final: pd.DataFrame, task: str) -> pd.DataFrame:
-    """The inference rates from the exclusive-node profile, where it exists.
+    """Each model's inference throughput, from the exclusive-node profile.
 
     scripts/profile_speed.py times every model on one signal per task in one
-    allocation; its rate, the signal per second, replaces the rate a run's
-    own evaluation gave, which was measured beside the run's neighbours.
+    allocation. Throughput is in millions of pixels or voxels per second, and
+    for radiance fields in rendered views per second (FPS); a model without a
+    profile has none.
     """
     path = ROOT / "logs" / "speed" / f"{task}.json"
-    if not path.exists():
-        return final
+    profile = json.loads(path.read_text()) if path.exists() else {}
     rates = {
-        "TensoRF" if model == TENSORF[task] else model: 1 / entry["seconds"]
-        for model, entry in json.loads(path.read_text()).items()
+        "TensoRF" if model == TENSORF[task] else model: (
+            1 / entry["seconds"] if task == "nerf" else entry["rate"] / 1e6
+        )
+        for model, entry in profile.items()
     }
-    return final.assign(speed=final["model"].map(rates).fillna(final["speed"]))
+    return final.assign(speed=final["model"].map(rates))
 
 
 def measured_memory(final: pd.DataFrame, task: str) -> pd.DataFrame:
-    """Each model's peak memory of training and of inference, in MB.
+    """Each model's peak memory of training and of inference, in GB.
 
     logs/memory/<task>/ holds a short run of every model on the profiled
     signal, long enough for a training step to reach its peak, and
@@ -461,9 +503,19 @@ def measured_memory(final: pd.DataFrame, task: str) -> pd.DataFrame:
     profile = json.loads(path.read_text()) if path.exists() else {}
     inference = {name(model): entry["memory"] for model, entry in profile.items()}
     return final.assign(
-        train_memory=final["model"].map(training) / 1e6,
-        infer_memory=final["model"].map(inference) / 1e6,
+        train_memory=final["model"].map(training) / 1e9,
+        infer_memory=final["model"].map(inference) / 1e9,
     )
+
+
+def memory_unit(values: pd.Series) -> tuple[str, float, int]:
+    """The unit a memory column is shown in, its factor from GB, and its decimals.
+
+    Gigabytes, unless every value stays under 1.5 GB: an axis that short has
+    too few whole or half gigabytes to tick, so it counts megabytes, and the
+    table follows its axis.
+    """
+    return ("GB", 1.0, 2) if values.max() >= 1.5 else ("MB", 1e3, 0)
 
 
 def load(task: str) -> tuple[list[dict[str, Any]], pd.DataFrame, pd.DataFrame]:
@@ -510,7 +562,9 @@ def within_signal(data: pd.DataFrame, metric: str) -> pd.Series:
     over models at every evaluation, and adding back the overall mean, leaves
     each model's mean curve unchanged while its spread shows only how
     consistently it scores relative to the others: the within-subject standard
-    error of Cousineau (2005), with the correction of Morey (2008).
+    error of Cousineau (2005), with the correction of Morey (2008). A signal's
+    level is its mean over every model evaluated there, not only the ones a
+    figure draws, so that a band pools the models its table pools.
     """
     step = ["signal", "iteration"]
     cell = [data["model"], data["iteration"]]
@@ -520,9 +574,14 @@ def within_signal(data: pd.DataFrame, metric: str) -> pd.Series:
         + data.groupby("iteration")[metric].transform("mean")
     )
     mean = centered.groupby(cell).transform("mean")
-    models = data["model"].nunique()
-    correction = (models / (models - 1)) ** 0.5 if models > 1 else 1.0
+    models = data.groupby("iteration")["model"].transform("nunique")
+    correction = np.sqrt(models / (models - 1)).where(models > 1, 1.0)
     return mean + (centered - mean) * correction
+
+
+def comparable(data: pd.DataFrame, metric: str) -> pd.Series:
+    """A metric as its errors are taken: within signal if it is PAIRED, else as is."""
+    return within_signal(data, metric) if metric in PAIRED else data[metric]
 
 
 def y_range(means: pd.DataFrame, metric: str) -> tuple[float, float]:
@@ -541,15 +600,16 @@ def y_range(means: pd.DataFrame, metric: str) -> tuple[float, float]:
 
 
 def paired_error(final: pd.DataFrame, metrics: Sequence[str]) -> pd.DataFrame:
-    """Each model's standard error over signals, once their levels are removed.
+    """Each model's standard error over signals, of the metric as compared.
 
-    Signals differ far more than models do, so the plain deviation over them
-    would say how hard the signals are; see :func:`within_signal`.
+    Where signals differ far more than models do, the plain deviation over
+    them would say how hard the signals are, so their levels are removed
+    first; see :func:`comparable`.
     """
     final = final.assign(iteration=0)  # one evaluation, the last
     return pd.DataFrame(
         {
-            ("mean", metric): final.assign(**{metric: within_signal(final, metric)})
+            ("mean", metric): final.assign(**{metric: comparable(final, metric)})
             .groupby("model")[metric]
             .sem()
             for metric in metrics
@@ -557,17 +617,50 @@ def paired_error(final: pd.DataFrame, metrics: Sequence[str]) -> pd.DataFrame:
     )
 
 
+class Halves(Locator):
+    """At most ``count`` ticks, every one a whole or a half number.
+
+    Of the steps 1/2, 1, 2, 2.5 and 5 times a power of ten, the finest that
+    keeps to ``count`` ticks within the axis' limits; ``whole`` leaves out the
+    steps that put a tick on a half.
+    """
+
+    def __init__(self, count: int = 5, whole: bool = False):
+        self.count, self.whole = count, whole
+
+    def __call__(self) -> list[float]:
+        return self.tick_values(*self.axis.get_view_interval())
+
+    def tick_values(self, vmin: float, vmax: float) -> list[float]:
+        low, high = sorted((vmin, vmax))
+        steps = {0.5} | {m * 10.0**k for k in range(12) for m in (1, 2, 2.5, 5)}
+        for step in sorted(steps):
+            if self.whole and step % 1:
+                continue
+            first, last = math.ceil(low / step), math.floor(high / step)
+            if last - first < self.count:
+                return [k * step for k in range(first, last + 1)]
+        return []
+
+
+def is_half(value: float) -> bool:
+    """Whether a number is whole or a half, as every tick is."""
+    return math.isclose(2 * value, round(2 * value), abs_tol=1e-9)
+
+
 def log_ticks(axis: Axis) -> None:
     """Label a log axis 1, 2, 5, 10, ... rather than 10^0, at most five ticks.
 
     Of the 1-2-3-5, 1-2-5 and 1 ticks per decade, it takes the densest that
-    keeps to five within the axis' limits.
+    keeps to five within the axis' limits; below one, only a half is ticked.
     """
     low, high = axis.get_view_interval()
     decades = range(int(np.log10(low)) - 1, int(np.log10(high)) + 2)
     for subs in ((1, 2, 3, 5), (1, 2, 5), (1,)):
         ticks = [
-            m * 10.0**k for k in decades for m in subs if low <= m * 10.0**k <= high
+            tick
+            for tick in (m * 10.0**k for k in decades for m in subs)
+            if low <= tick <= high and is_half(tick)
         ]
         if len(ticks) <= 5:
             break
@@ -585,11 +678,10 @@ def quality_ticks(plot: plt.Axes, metric: str, low: float, high: float) -> None:
     """
     if metric == "psnr":
         low, high = math.floor(low), math.ceil(high)
-        plot.yaxis.set_major_locator(MaxNLocator(5, integer=True))
     else:  # IoU, which cannot pass 100
         low, high = math.floor(2 * low) / 2, min(math.ceil(2 * high) / 2, 100.0)
-        plot.yaxis.set_major_locator(MultipleLocator(0.5))
-        plot.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
+    plot.yaxis.set_major_locator(Halves(whole=metric == "psnr"))
+    plot.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     plot.set_ylim(low, high)
 
 
@@ -607,8 +699,15 @@ def legend() -> plt.Figure:
                markerfacecolor=color if filled else "white", label=model)
         for model, (color, dashes, filled) in FEATURED.items()
     ] + [Line2D([], [], color=OTHERS, marker="o", ls="", label="Other models")]  # fmt: skip
-    figure = plt.figure(figsize=(3 * SIZE[0], 0.3))
-    figure.legend(handles=handles, loc="center", ncol=len(handles), frameon=False)
+    figure = plt.figure(figsize=(WIDTH, 0.2))
+    figure.legend(
+        handles=handles,
+        loc="center",
+        ncol=len(handles),
+        frameon=False,
+        columnspacing=1.2,
+        handletextpad=0.5,
+    )
     return figure
 
 
@@ -619,10 +718,11 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
     """
     metric, label, _ = TASKS[task]
     reference = curve[curve["model"] == REFERENCE][metric].mean()
+    # Where a signal's level is removed, every model evaluated there sets it.
+    curve = curve.assign(**{metric: comparable(curve, metric)})
     curve = curve[curve["model"].isin(FEATURED)]
     curve = curve.assign(
-        time=curve.groupby(["model", "iteration"])["time"].transform("mean"),
-        **{metric: within_signal(curve, metric)},
+        time=curve.groupby(["model", "iteration"])["time"].transform("mean")
     )
     figure, plot = plt.subplots(figsize=SIZE)
     sns.lineplot(
@@ -633,8 +733,8 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
         palette={model: color for model, (color, _, _) in FEATURED.items()},
         style="model",
         dashes={model: dashes for model, (_, dashes, _) in FEATURED.items()},
-        errorbar=("se", 1),
-        err_kws={"alpha": 0.15, "linewidth": 0},
+        errorbar=("se", BAND),
+        err_kws={"alpha": 0.2, "linewidth": 0},
         legend=False,
         ax=plot,
     )
@@ -653,8 +753,9 @@ def convergence(curve: pd.DataFrame, task: str) -> plt.Figure:
         if model not in means["model"].values:  # a sweep still running
             continue
         last = means[means["model"] == model].iloc[-1]
-        plot.plot(last["time"], last[metric], marker="o", markersize=4,
-                  color=color, markerfacecolor=color if filled else "white",
+        plot.plot(last["time"], last[metric], marker="o", markersize=3.5,
+                  markeredgewidth=0.9, color=color,
+                  markerfacecolor=color if filled else "white",
                   clip_on=False, zorder=4)  # fmt: skip
     plot.set(
         xscale="log",
@@ -678,22 +779,30 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
     """
     metric, label, _ = TASKS[task]
     # The cost axis carries its direction, as the table headers do: a reader
-    # pauses over whether more inference rate is better, never over PSNR.
-    axis = {
-        "time": r"Training time (s)$\,\downarrow$",
-        "speed": rf"Inference ({SPEED[task]})$\,\uparrow$",
-        "train_memory": r"Training memory (MB)$\,\downarrow$",
-        "infer_memory": r"Inference memory (MB)$\,\downarrow$",
-    }[cost]
+    # pauses over whether more throughput is better, never over PSNR.
+    speed = "Rendering speed" if task == "nerf" else "Throughput"
     means = final.groupby("model")[[cost, metric]].mean()
     # The interpolations take no training: they set the reference level, not a point.
     trained = means[final.groupby("model")["time"].mean() > 0]
+    unit = "GB"
+    if cost.endswith("memory"):
+        unit, factor, _ = memory_unit(trained[cost])
+        means[cost] *= factor
+        trained = means.loc[trained.index]
+    axis = {
+        "time": r"Training time (s)$\,\downarrow$",
+        "speed": rf"{speed} ({SPEED[task]})$\,\uparrow$",
+        "train_memory": rf"Training memory ({unit})$\,\downarrow$",
+        "infer_memory": rf"Inference memory ({unit})$\,\downarrow$",
+    }[cost]
     others = trained[~trained.index.isin(FEATURED)]
     figure, plot = plt.subplots(figsize=SIZE)
     if REFERENCE in means.index:
         level = means.loc[REFERENCE, metric]
         plot.axhline(level, color="0.4", linestyle=":", linewidth=0.8, zorder=1)
-    plot.scatter(others[cost], others[metric], s=14, color=OTHERS, zorder=2)
+    plot.scatter(
+        others[cost], others[metric], s=10, color=OTHERS, linewidth=0, zorder=2
+    )
     for model, (color, _, filled) in FEATURED.items():
         if model not in means.index:  # a sweep still running
             continue
@@ -701,22 +810,23 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
         plot.scatter(
             x,
             y,
-            s=30,
+            s=20,
             facecolor=color if filled else "white",
             edgecolor=color,
+            linewidth=0.9,
             zorder=3,
         )
     # Explicit limits, so that the pair of figures shares a quality axis and
     # no marker touches a spine.
     plot.set(xlim=padded(trained[cost]), xlabel=axis, ylabel=label)
-    # Memory runs to five digits, which only four ticks leave room for.
-    plot.xaxis.set_major_locator(MaxNLocator(4 if "memory" in cost else 5))
+    plot.xaxis.set_major_locator(Halves())
+    plot.xaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     low, high = padded(trained[metric])
     if task in BOTTOM:
         low = BOTTOM[task]
         under = others[others[metric] < low]
-        plot.scatter(under[cost], [low] * len(under), s=14, marker="v",
-                     color=OTHERS, clip_on=False, zorder=2)  # fmt: skip
+        plot.scatter(under[cost], [low] * len(under), s=10, marker="v",
+                     color=OTHERS, linewidth=0, clip_on=False, zorder=2)  # fmt: skip
     quality_ticks(plot, metric, low, high)
     return figure
 
@@ -764,16 +874,23 @@ def table(
             for text, error, rank in (cells[model, name] for name in spec)
         ]
 
-    titles = [index] + [
-        title if larger_is_better is None
-        else f"{title} {'↑' if larger_is_better else '↓'}"
-        for _, title, larger_is_better, _ in spec.values()
-    ]  # fmt: skip
     groups = [""] + [group for group, *_ in spec.values()]
+    titles = [index] + [title for _, title, _, _ in spec.values()]
+    arrows = [""] + [
+        "" if larger_is_better is None else "↑" if larger_is_better else "↓"
+        for _, _, larger_is_better, _ in spec.values()
+    ]
+    flat = [
+        " ".join(filter(None, (group, title, arrow)))
+        for group, title, arrow in zip(groups, titles, arrows)
+    ]
     # Numbers right against a fixed number of decimals, which lines their
-    # points up; the headers stay centred over them.
-    latex = [rf"\begin{{tabular}}{{l{'r' * (len(titles) - 1)}}}", r"\toprule"]
-    flat = [f"{group} {title}".strip() for group, title in zip(groups, titles)]
+    # points up; the headers stay centred over them, a name over its unit and
+    # direction, so that a column is as wide as its numbers rather than its
+    # header. No padding outside the first and last columns, so that the
+    # rules end with the text.
+    columns = "l" + "r" * (len(titles) - 1)
+    latex = [rf"\begin{{tabular}}{{@{{}}{columns}@{{}}}}", r"\toprule"]
     if any(groups):  # a spanning header over each group's columns
         spans, rules, first = [], [], 1
         for group, columns in groupby(groups):
@@ -783,8 +900,15 @@ def table(
                 rules.append(rf"\cmidrule(lr){{{first}-{first + width - 1}}}")
             first += width
         latex += [" & ".join(spans) + r" \\", "".join(rules)]
-    centered = [titles[0]] + [rf"\multicolumn{{1}}{{c}}{{{t}}}" for t in titles[1:]]
-    latex += [" & ".join(centered) + r" \\", r"\midrule"]
+    names, units = zip(*(title.partition(" (")[::2] for title in titles))
+    units = [
+        " ".join(filter(None, (f"({unit}" if unit else "", arrow)))
+        for unit, arrow in zip(units, arrows)
+    ]
+    for row in (names, units) if any(units) else (names,):
+        header = [row[0]] + [rf"\multicolumn{{1}}{{c}}{{{cell}}}" for cell in row[1:]]
+        latex.append(" & ".join(header) + r" \\")
+    latex.append(r"\midrule")
     markdown = ["| " + " | ".join(flat) + " |", "| --- " * len(flat) + "|"]
     tex_mark = (
         {1: r"\cellcolor{{best}}\textbf{{{}}}", 2: r"\cellcolor{{second}}{}"}
@@ -852,24 +976,32 @@ def per_signal(
 def tables(final: pd.DataFrame, task: str) -> dict[str, str]:
     """The task's table, with its metrics per signal where the signals are few.
 
-    The averaged columns carry one paired standard error over the signals.
-    NeRF's table has a super column per scene over its three metrics, so it
-    needs the width of a page turned sideways.
+    Every model's size, the cost of each phase and its mean metrics over the
+    signals, each mean with one paired standard error. The shapes and the
+    scenes are few, so their table gives each one's scores as well, under a
+    super column per scene for NeRF's three metrics: wider than the text, it
+    takes a page turned sideways.
     """
     metrics = TASKS[task][2]
-    # The size and training time every table opens with, as TensoRF, K-Planes
-    # and NeuRBF report them, and the peak memory of training and inference;
-    # the inference rate stays in the throughput plot.
+    # Every table opens with the size and the cost of each phase: training
+    # time, as TensoRF, K-Planes and NeuRBF report it, inference throughput,
+    # and the peak memory of both.
+    throughput = SPEED[task] if task == "nerf" else f"Throughput ({SPEED[task]})"
     spec = {
         "parameters": PARAMS,
-        "time": ("", "Train time (s)", False, 1),
-        "train_memory": ("Memory (MB)", "Train", False, 0),
-        "infer_memory": ("Memory (MB)", "Inference", False, 0),
+        "time": ("Training", "Time (s)", False, 1),
+        "train_memory": ("Training", "Mem.", False, 2),
+        "speed": ("Inference", throughput, True, 1),
+        "infer_memory": ("Inference", "Mem.", False, 2),
     }
     values = final.groupby("model")[list(spec)].mean()
     # Interpolations have no parameters and train nothing, so neither column
     # applies to them, nor should they top its ranking.
     values[values["time"] <= 0] = np.nan
+    for column in ("train_memory", "infer_memory"):  # in the unit of its axis
+        unit, factor, decimals = memory_unit(values[column])
+        values[column] *= factor
+        spec[column] = (spec[column][0], f"Mem. ({unit})", False, decimals)
     errors = paired_error(final, metrics)
     if task in ("image", "super_resolution"):  # many images, so their mean alone
         for metric in metrics:
@@ -1252,7 +1384,40 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
     span = rows + (rows - 1) * gap
     aspect = width / height
     drawn = aspect if REFERENCE_ASPECT is None else min(aspect, REFERENCE_ASPECT)
-    unit = WIDTH / (drawn * span + gutter + columns + (columns - 1) * gap)
+    winner = scores[list(models)].idxmax()  # both plotted metrics are larger-better
+    shown = [("Ground truth", "truth", "")] + [
+        (model, model, UNITS[metric].format(scores[model])) for model in models
+    ]
+
+    def fitting(labels: list[str], spacing: float, weight: str = "normal") -> float:
+        """The size, at most LABEL_SIZE, that keeps 8% of ``spacing`` free.
+
+        ``spacing`` is the points between neighbouring centres, and the widest
+        pair of neighbours sets the size, measured in the figure's own font.
+        """
+        widths = [text_width(label, weight) for label in labels]
+        pairs = [(a + b) / 2 for a, b in zip(widths, widths[1:])]
+        return min(LABEL_SIZE, 0.92 * spacing / max(pairs))
+
+    # Titles and scores each as large as their columns allow, the titles no
+    # smaller than LABEL_FLOOR: the magnification that size needs, in inches,
+    # bounds how wide the reference is drawn. The last title may be wider than
+    # its magnification, so the panels leave it the room it overhangs by, and
+    # the strip, title and all, spans WIDTH.
+    titles = [title for title, _, _ in shown]
+    widths = [text_width(title) for title in titles]
+    widest = max((a + b) / 2 for a, b in zip(widths, widths[1:]))
+    least = LABEL_FLOOR * widest / (0.92 * (1 + gap) * 72)
+    fixed = gutter + columns + (columns - 1) * gap  # in magnifications
+    wanted, overhang = drawn, 0.0
+    for _ in range(2):  # the overhang follows the size it allows, so twice
+        room = (WIDTH - overhang) / least - fixed
+        drawn = max(min(wanted, room / span), 0.5)  # at least half as wide as tall
+        unit = (WIDTH - overhang) / (drawn * span + fixed)
+        spacing = (1 + gap) * unit * 72  # points between column centres
+        title_size = fitting(titles, spacing)
+        overhang = max(0.0, widths[-1] * title_size / 72 - unit) / 2
+    score_size = fitting([score for _, _, score in shown if score], spacing, "bold")
     above, below = LABEL_ROOM  # inches kept for the titles and the scores
     tall = span * unit + above + below
     figure = plt.figure(figsize=(WIDTH, tall))
@@ -1274,22 +1439,6 @@ def qualitative(task: str, signal: str, final: pd.DataFrame, directory: Path):
             Rectangle((left, top), side, side, fill=False, color=color, linewidth=0.9)
         )
 
-    winner = scores[list(models)].idxmax()  # both plotted metrics are larger-better
-    shown = [("Ground truth", "truth", "")] + [
-        (model, model, UNITS[metric].format(scores[model])) for model in models
-    ]
-    # Titles and scores each as large as their columns allow: the widest pair
-    # of neighbours keeps 8% of the column spacing between them, measured in
-    # the figure's own font, and both are capped at LABEL_SIZE.
-    spacing = (1 + gap) * unit * 72  # points between column centres
-
-    def fitting(labels: list[str], weight: str = "normal") -> float:
-        widths = [text_width(label, weight) for label in labels]
-        pairs = [(a + b) / 2 for a, b in zip(widths, widths[1:])]
-        return min(LABEL_SIZE, 0.92 * spacing / max(pairs))
-
-    title_size = fitting([title for title, _, _ in shown])
-    score_size = fitting([score for _, _, score in shown if score], "bold")
     for column, (title, name, score) in enumerate(shown):
         for row, (left, top) in enumerate(found):
             plot = place(
@@ -1360,7 +1509,7 @@ def basis_table(runs: list[dict]) -> dict[str, str]:
     summary.index = [name.removeprefix("FUTON-").title() for name in summary.index]
     spec = {
         "parameters": PARAMS,
-        "time": ("", "Train time (s)", False, 1),
+        "time": ("", "Training time (s)", False, 1),
         "psnr": ("", "PSNR (dB)", True, 2),
     }
     errors = summary[["error"]].rename(columns={"error": "psnr"})
@@ -1378,7 +1527,7 @@ def variant_table(
     """
     spec = {"parameters": PARAMS}
     for basis in PAIR:
-        spec[f"time_{basis}"] = (f"FUTON-{basis}", "Train time (s)", False, 1)
+        spec[f"time_{basis}"] = (f"FUTON-{basis}", "Training time (s)", False, 1)
         spec[f"psnr_{basis}"] = (f"FUTON-{basis}", "PSNR (dB)", True, 2)
 
     values, errors = {}, {}
@@ -1413,17 +1562,18 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
     left out: its models are too small to matter and only compress the axis.
     """
     data = results(runs).assign(iteration=0)  # one evaluation, the last
+    data["psnr"] = within_signal(data, "psnr")  # the study's every model
     data = data.join(data["model"].str.extract(GRID))
     data[["alpha", "beta"]] = data[["alpha", "beta"]].astype(float)
     data = data[data["alpha"].isin(SHOWN) & data["beta"].isin(SHOWN)]
-    data["psnr"] = within_signal(data, "psnr")
     labels = {
         "alpha": r"Components per pixel $\alpha$",
         "beta": r"Rank over components $\beta$",
     }
     for basis, rows in data.groupby("basis"):
         for axis, hue in (("beta", "alpha"), ("alpha", "beta")):
-            figure, plot = plt.subplots(figsize=SIZE)
+            # The legend's two rows, its name and its levels, above the plot.
+            figure, plot = plt.subplots(figsize=(SIZE[0], SIZE[1] + 2 * LEGEND_ROW))
             sns.lineplot(
                 data=rows,
                 x=axis,
@@ -1432,11 +1582,12 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
                 style=hue,
                 markers=True,
                 dashes=False,
-                errorbar=("se", 1),
+                errorbar=("se", BAND),
+                err_kws={"alpha": 0.2, "linewidth": 0},
                 palette=list(RAMP[-rows[hue].nunique() :]),
-                markersize=4,
+                markersize=3.5,
                 markeredgecolor="white",
-                markeredgewidth=0.5,
+                markeredgewidth=0.4,
                 ax=plot,
             )
             plot.set(xscale="log", xlabel=labels[axis], ylabel="PSNR (dB)")
@@ -1446,42 +1597,42 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
                 levels, [FRACTIONS.get(level, f"{level:g}") for level in levels]
             )
             plot.xaxis.set_minor_locator(NullLocator())
-            plot.yaxis.set_major_locator(MaxNLocator(5, integer=True))
-            # A white ground under the legend, since "best" still puts it over
-            # a curve in a panel this small.
+            plot.yaxis.set_major_locator(Halves(whole=True))
+            # Above the plot, the levels in a row after their name.
             handles, texts = plot.get_legend_handles_labels()
-            plot.legend(
+            plot.get_legend().remove()
+            figure.legend(
                 handles,
                 [FRACTIONS.get(float(text), text) for text in texts],
                 title=labels[hue].split()[-1],
-                framealpha=0.85,
-                edgecolor="none",
-                ncol=2,
-                columnspacing=0.8,
-                fontsize=6,
-                title_fontsize=7,
+                loc="outside upper center",
+                ncol=len(handles),
+                frameon=False,
+                columnspacing=0.9,
+                handlelength=1.2,
+                handletextpad=0.3,
+                alignment="center",
             )
             save(figure, out_dir / f"{axis}_{basis}")
 
 
 def study_curves(
-    curve: pd.DataFrame,
-    styles: dict[str, tuple[str, str, tuple]],
-    path: Path,
-    loc: str = "best",
+    curve: pd.DataFrame, styles: dict[str, tuple[str, str, tuple]], path: Path
 ) -> None:
     """PSNR against training time for a study's models, with its own legend.
 
     ``styles`` gives each model its label, colour and dashes, in the order the
-    legend takes them, and ``loc`` places the legend. The band is one
-    within-signal standard error, as in the task figures.
+    legend takes them, over the plot. The band is one within-signal standard
+    error, as in the task figures.
     """
+    curve = curve.assign(psnr=within_signal(curve, "psnr"))  # the study's every model
     curve = curve[curve["model"].isin(styles)]
     curve = curve.assign(
-        time=curve.groupby(["model", "iteration"])["time"].transform("mean"),
-        psnr=within_signal(curve, "psnr"),
+        time=curve.groupby(["model", "iteration"])["time"].transform("mean")
     )
-    figure, plot = plt.subplots(figsize=(2.6, 2.1))
+    # The legend above the plot in two columns, a hue to a column.
+    rows = math.ceil(len(styles) / 2)
+    figure, plot = plt.subplots(figsize=(SIZE[0], SIZE[1] + rows * LEGEND_ROW))
     sns.lineplot(
         data=curve,
         x="time",
@@ -1491,8 +1642,8 @@ def study_curves(
         palette={model: color for model, (_, color, _) in styles.items()},
         style="model",
         dashes={model: dashes for model, (_, _, dashes) in styles.items()},
-        errorbar=("se", 1),
-        err_kws={"alpha": 0.15, "linewidth": 0},
+        errorbar=("se", BAND),
+        err_kws={"alpha": 0.2, "linewidth": 0},
         legend=False,
         ax=plot,
     )
@@ -1514,22 +1665,31 @@ def study_curves(
         Line2D([], [], color=color, dashes=dashes or (None, None), label=label)
         for label, color, dashes in styles.values()
     ]
-    plot.legend(
+    figure.legend(
         handles=handles,
-        loc=loc,
-        framealpha=0.85,
-        edgecolor="none",
+        loc="outside upper center",
         ncol=2,
+        frameon=False,
         columnspacing=0.8,
-        fontsize=6,
+        handlelength=1.5,
+        handletextpad=0.4,
     )
     save(figure, path)
 
 
 def write(rendered: dict[str, str], path: Path) -> None:
-    """Save a table's renderings as <path>.tex and <path>.md."""
+    """Save a table's renderings as <path>.tex and <path>.md.
+
+    The LaTeX comes set in TABLE_SIZE with TABLE_GAP between columns, in a
+    group of its own, so that it fits the text width wherever it is input.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     for suffix, text in rendered.items():
+        if suffix == "tex":
+            text = (
+                rf"{{{TABLE_SIZE}\setlength{{\tabcolsep}}{{{TABLE_GAP}}}%"
+                + f"\n{text}}}\n"
+            )
         path.with_suffix(f".{suffix}").write_text(text)
 
 
@@ -1552,8 +1712,7 @@ def ablation(out_dir: Path) -> None:
             write(table_of, out_dir / name)
     for name, styles in CURVES.items():
         if studies[name]:
-            loc = LEGEND_LOC.get(name, "best")
-            study_curves(curves(studies[name]), styles, out_dir / name, loc)
+            study_curves(curves(studies[name]), styles, out_dir / name)
 
 
 def main() -> None:
@@ -1588,9 +1747,7 @@ def main() -> None:
             print(f"{task}: no runs under logs/{task}, skipped")
             continue
         runs, final, curve = load(task)
-        (out_dir / task).mkdir(parents=True, exist_ok=True)
-        for suffix, text in tables(final, task).items():
-            (out_dir / task / f"table.{suffix}").write_text(text)
+        write(tables(final, task), out_dir / task / "table")
         if not final["model"].isin(FEATURED).any():  # a sweep still running
             print(f"{task}: no featured model has finished, so no figures yet")
             continue
@@ -1612,11 +1769,8 @@ def main() -> None:
                 )
             figure = qualitative(task, signal, final, directory)
             # PDF only: a PGF of raster panels writes each one out beside it.
-            figure.savefig(
-                out_dir / task / f"qualitative_{signal}.pdf",
-                bbox_inches="tight",
-                dpi=600,
-            )
+            # Laid out in inches to WIDTH, so saved whole rather than trimmed.
+            figure.savefig(out_dir / task / f"qualitative_{signal}.pdf", dpi=600)
             plt.close(figure)
         print(f"{task}: written to {out_dir / task}")
     ablation(out_dir / "ablation")

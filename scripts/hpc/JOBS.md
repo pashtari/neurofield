@@ -160,15 +160,17 @@ nothing else. Per task, in `results/<task>/` so that each is a LaTeX
 subfigure:
 
 - quality against training time, for FUTON and the strongest model of each
-  other family, the band one within-signal standard error; time is logarithmic,
-  where the curves span more than a decade of it, and the metric linear;
-- every model's final quality against its training time, and against its
-  inference rate, both axes linear;
-- one table of every model's size, training time and final metrics, the best in
-  bold and the second underlined. The averages carry one standard error over
-  the signals, taken once each signal's own level is removed. The occupancy
-  table also gives each shape's IoU, and the NeRF one every scene's metrics
-  under a super column, which takes a page turned sideways;
+  other family, the band one standard error, as in the tables; time is
+  logarithmic, where the curves span more than a decade of it, and the metric
+  linear;
+- every model's final quality against its training time, its inference
+  throughput, and its peak training and inference memory, all axes linear;
+- one table of every model's size, the cost of both phases and its mean final
+  metrics, the best in bold and the second underlined. The averages carry one
+  standard error over the signals, taken once each signal's own level is
+  removed, but for IoU, which saturates on every shape. The occupancy table also gives each shape's IoU, and the NeRF one
+  every scene's metrics under a super column, which takes a page turned
+  sideways;
 - for each of the task's example signals, that signal with two regions boxed,
   each in its own colour, and those regions magnified for the ground truth and
   every featured model, framed in the colour of their box. The regions are

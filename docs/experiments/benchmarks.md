@@ -1,6 +1,6 @@
 # Benchmarks
 
-Twelve models on four tasks, at equal parameter count per task; the fourth, super-resolution, adds the deep image prior and three interpolations as references. The tables are `results/<task>/table.md` as `scripts/report_paper.py` writes them from the runs in `logs/`; the figures are the paper's. Bold marks the best value in a column and italics the second; ± is one standard error over the signals, after removing each signal's own level (a paired standard error).
+Twelve models on four tasks, at equal parameter count per task; the fourth, super-resolution, adds the deep image prior and three interpolations as references. The tables are `results/<task>/table.md` as `scripts/report_paper.py` writes them from the runs in `logs/`; the figures are the paper's. Bold marks the best value in a column and italics the second; ± is one standard error over the signals, after removing each signal's own level (a paired standard error); IoU, which saturates near 100 % on every shape, takes the plain standard error over the shapes.
 
 Two notes on the rows. **TensoRF** is the variant its authors recommend for the dimension: CP on images (the only one in 2D) and VM on volumes and radiance fields; both are in the configs. **WIRE** is the real Gabor variant (`nf.RealWIRE`) from the WIRE paper and code.
 
@@ -27,7 +27,7 @@ Accuracy comes from the benchmark sweeps. Times are measured separately: every m
 
 <figure markdown="span">
   ![Kodak: convergence, training-time trade-off and throughput](../assets/results_image.svg){ width="960" }
-  <figcaption>PSNR against training time for FUTON and the strongest model of each family, the band one within-image standard error; every model's final PSNR against its training time; and against its inference rate, in images per second.</figcaption>
+  <figcaption>PSNR against training time for FUTON and the strongest model of each family, the band one within-image standard error; every model's final PSNR against its training time; and against its inference throughput.</figcaption>
 </figure>
 
 <figure markdown="span">
@@ -42,18 +42,18 @@ Five Stanford shapes voxelized at 256 samples per unit length and cropped to the
 
 | Model | Params (k) | Train time (s) ↓ | Armadillo | Dragon | Happy Buddha | Lucy | Thai Statue | Mean IoU (%) ↑ |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| RFF | 132.2 | *7.4* | 99.85 | 99.84 | 99.68 | 98.76 | 99.66 | 99.56 ± 0.18 |
-| PE-MLP | 131.3 | 9.8 | 98.96 | 98.53 | 98.96 | 98.21 | 98.19 | 98.57 ± 0.14 |
-| MFN | 133.8 | 19.3 | 99.16 | 97.99 | 97.93 | 98.64 | 99.12 | 98.57 ± 0.29 |
+| RFF | 132.2 | *7.4* | 99.85 | 99.84 | 99.68 | 98.76 | 99.66 | 99.56 ± 0.20 |
+| PE-MLP | 131.3 | 9.8 | 98.96 | 98.53 | 98.96 | 98.21 | 98.19 | 98.57 ± 0.17 |
+| MFN | 133.8 | 19.3 | 99.16 | 97.99 | 97.93 | 98.64 | 99.12 | 98.57 ± 0.27 |
 | SIREN | 132.9 | 10.5 | 99.00 | 99.34 | 99.57 | 99.09 | 98.76 | 99.15 ± 0.14 |
-| Gauss | 132.9 | 12.1 | 99.70 | 99.75 | 99.59 | 99.62 | 99.41 | 99.61 ± 0.05 |
+| Gauss | 132.9 | 12.1 | 99.70 | 99.75 | 99.59 | 99.62 | 99.41 | 99.61 ± 0.06 |
 | WIRE | 133.4 | 13.8 | 99.65 | 99.70 | 99.60 | 99.60 | 99.45 | 99.60 ± 0.04 |
 | FINER | 132.9 | 11.7 | 99.54 | 99.67 | 99.70 | 99.56 | 99.41 | 99.58 ± 0.05 |
-| Instant-NGP | 132.4 | 10.3 | 99.91 | *99.90* | 99.81 | **99.90** | 99.81 | 99.87 ± 0.04 |
-| TensoRF | 130.0 | **6.3** | 99.82 | 99.86 | 99.79 | 99.60 | 99.56 | 99.73 ± 0.03 |
-| GA-Planes | 132.0 | 9.5 | 99.80 | 99.87 | 99.88 | 99.80 | 99.71 | 99.81 ± 0.04 |
-| FUTON-sinc | 131.7 | 10.3 | **99.95** | **99.91** | **99.92** | 99.87 | **99.86** | **99.90** ± 0.03 |
-| FUTON-lanczos | 131.7 | *7.4* | **99.95** | *99.90* | **99.92** | *99.88* | *99.85* | **99.90** ± 0.03 |
+| Instant-NGP | 132.4 | 10.3 | 99.91 | *99.90* | 99.81 | **99.90** | 99.81 | 99.87 ± 0.02 |
+| TensoRF | 130.0 | **6.3** | 99.82 | 99.86 | 99.79 | 99.60 | 99.56 | 99.73 ± 0.06 |
+| GA-Planes | 132.0 | 9.5 | 99.80 | 99.87 | 99.88 | 99.80 | 99.71 | 99.81 ± 0.03 |
+| FUTON-sinc | 131.7 | 10.3 | **99.95** | **99.91** | **99.92** | 99.87 | **99.86** | **99.90** ± 0.02 |
+| FUTON-lanczos | 131.7 | *7.4* | **99.95** | *99.90* | **99.92** | *99.88* | *99.85* | **99.90** ± 0.02 |
 
 <figure markdown="span">
   ![Occupancy: convergence, training-time trade-off and throughput](../assets/results_occupancy.svg){ width="960" }

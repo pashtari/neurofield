@@ -120,6 +120,8 @@ Coordinates live in [-1, 1] on every axis, targets in the model's output range, 
 
 **Training and evaluation**: `nf.train`, `nf.evaluate`, `nf.chunked_inference`; metrics `psnr`, `ssim`, `ms_ssim`, `lpips`, `nmse`, `iou`, `bits_per_pixel`; losses `rate_distortion_loss`, `sdf_loss`; `uniform_quantize` / `uniform_dequantize` and quantization-aware training.
 
+**Solvers**: `nf.LeastSquares` and `nf.MultiplicativeUpdate` fit a FUTON with a linear decoder by block coordinate descent, through the same `nf.train` call, in place of Adam.
+
 **Image compression** (`nf.compression`): a FUTON codec, PIL codecs as baselines, and one function that measures any codec.
 
 ```python

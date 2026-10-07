@@ -17,6 +17,7 @@ from .futon import (
     TRCombiner,
     TriangleBasis,
 )
+from .futon_solvers import BCD, LeastSquares, MultiplicativeUpdate
 from .gaplanes import GAPlanes
 from .gauss import Gauss, GaussLayer
 from .grid_inr import GridINR
@@ -64,6 +65,9 @@ __all__ = [
     "CPCombiner",
     "TRCombiner",
     "FUTON",
+    "BCD",
+    "LeastSquares",
+    "MultiplicativeUpdate",
     "GAPlanes",
     "TensoRF",
     "HashEncoding",

@@ -128,14 +128,18 @@ class _Basis(nn.Module):
             features[off_grid] = self._evaluate(x[off_grid], axis)
         return features
 
-    def _axis_features(self, x: Tensor, axis: int) -> Tensor:
+    def axis_features(self, x: Tensor, axis: int) -> Tensor:
+        """The dense features ``(*, K_axis)`` of one axis at coordinates ``(*,)``.
+
+        Coordinates on a cached grid read its table; the others are evaluated.
+        """
         if self.grid_size is None:
             return self._evaluate(x, axis)
         return self._lookup(x, axis, self.grid_size[axis])
 
     def _features(self, x: Tensor) -> tuple[Tensor, ...]:
         return tuple(
-            self._axis_features(x[..., axis], axis) for axis in range(self.in_features)
+            self.axis_features(x[..., axis], axis) for axis in range(self.in_features)
         )
 
     def forward(self, x: Tensor) -> tuple[Tensor, ...]:

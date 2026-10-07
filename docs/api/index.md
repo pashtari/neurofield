@@ -11,7 +11,7 @@ The public API lives in three namespaces. Everything for fitting coordinate/valu
 The pages of this section are organized by module. Each documents the public classes and functions with their signatures, tensor shapes and defaults, as written in the source.
 
 - [neurofield.models](models.md): every architecture except FUTON, with its layers and encodings.
-- [FUTON, bases and combiners](futon.md): `FUTON`, the six bases, the three combiners, and the sparse `RCSMatrix`.
+- [FUTON, bases and combiners](futon.md): `FUTON`, the six bases, the three combiners, the block coordinate descent solvers, and the sparse `RCSMatrix`.
 - [Datasets](datasets.md): coordinate datasets for images, volumes and MRI, and the Deep Image Prior dataset.
 - [Training and evaluation](training.md): `train`, `train_epoch`, `evaluate`, `chunked_inference`.
 - [Metrics and losses](metrics.md): PSNR, SSIM, MS-SSIM, LPIPS, NMSE, IoU, bits per pixel; rate-distortion, SDF and entropy losses.

@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from .evaluation import evaluate
+from .models.futon_solvers import BCD
 from .quantization import uniform_quantize
 from .utils import _average_dicts, count_parameters, setup_experiment_loggers
 
@@ -25,14 +26,17 @@ LossFn: TypeAlias = Callable[
 ]
 
 
+def _mse_metrics(mse: Tensor) -> dict[str, float]:
+    """The MSE and the PSNR of targets in ``[-1, 1]``, as floats."""
+    return {"mse": mse.item(), "psnr": (10 * torch.log10(4.0 / mse)).item()}
+
+
 def _mse_loss(
     batch: dict[str, Any], model: nn.Module
 ) -> tuple[Tensor, dict[str, float]]:
     """Default reconstruction loss, with PSNR for targets in ``[-1, 1]``."""
-    output = model(batch["input"])
-    mse = F.mse_loss(output, batch["target"])
-    psnr = 10 * torch.log10(4.0 / mse)
-    return mse, {"mse": mse.detach().item(), "psnr": psnr.detach().item()}
+    mse = F.mse_loss(model(batch["input"]), batch["target"])
+    return mse, _mse_metrics(mse.detach())
 
 
 def train_epoch(
@@ -47,8 +51,11 @@ def train_epoch(
 
     Tensor entries without an underscore-prefixed key are moved to ``device``.
     ``loss_fn(batch, model)`` returns a scalar loss and float metrics. Optimizer
-    and scheduler each step once per batch. The model is left in training mode.
-    ``device=None`` selects CUDA when available, else CPU.
+    and scheduler each step once per batch. A block coordinate descent solver,
+    :class:`~neurofield.models.futon_solvers.BCD`, fits each batch itself and
+    reports its squared error instead, so ``loss_fn`` is not called. The model
+    is left in training mode. ``device=None`` selects CUDA when available,
+    else CPU.
     """
     device = device or torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -63,11 +70,14 @@ def train_epoch(
             if isinstance(value, Tensor) and not key.startswith("_"):
                 batch[key] = value.to(device)
 
-        loss, metrics = loss_fn(batch, model)
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        if isinstance(optimizer, BCD):
+            loss = optimizer.step(batch)
+            metrics = _mse_metrics(loss)
+        else:
+            loss, metrics = loss_fn(batch, model)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
         scheduler.step()
 
         last_metrics = metrics
@@ -83,6 +93,7 @@ def train(
     loss_fn: LossFn | None = None,
     batch_size: int = 1,
     num_epochs: int = 1000,
+    optimizer: Optimizer | None = None,
     lr: float = 0.01,
     weight_decay: float = 0.0,
     adam_betas: tuple[float, float] = (0.9, 0.999),
@@ -101,7 +112,7 @@ def train(
     log_dir: str | os.PathLike[str] | None = None,
     seed: int = 0,
 ) -> dict[str, Any]:
-    """Fit a neural field with Adam and a cosine-annealed learning rate.
+    """Fit a neural field, by default with Adam and a cosine-annealed learning rate.
 
     Moves model and supported datasets to ``device`` in place. The scheduler
     steps per batch with ``T_max=num_epochs`` and a minimum rate of ``lr / 100``.
@@ -116,6 +127,12 @@ def train(
             ``None`` uses MSE and logs PSNR assuming targets in ``[-1, 1]``.
         batch_size: Training batch size.
         num_epochs: Number of training epochs.
+        optimizer: Steps once per batch, its learning rate under the cosine
+            schedule; ``None`` builds Adam from ``lr``, ``weight_decay``,
+            ``adam_betas`` and ``adam_eps``. A block coordinate descent solver
+            for FUTON, :class:`~neurofield.models.futon_solvers.BCD`, fits
+            each batch itself, without ``loss_fn``; its learning rate is the
+            weight of the newest batch in its statistics.
         lr: Initial learning rate.
         weight_decay: Adam weight decay.
         adam_betas: Adam moment decay rates; hash grids use ``(0.9, 0.99)``.
@@ -188,21 +205,31 @@ def train(
     if loss_fn is None:
         loss_fn = _mse_loss
 
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=lr,
-        betas=adam_betas,
-        eps=adam_eps,
-        weight_decay=weight_decay,
-    )
+    if optimizer is None:
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=lr,
+            betas=adam_betas,
+            eps=adam_eps,
+            weight_decay=weight_decay,
+        )
     logger.info("Optimizer: %s", type(optimizer).__name__)
     config["optimizer"] = type(optimizer).__name__
+    lr = optimizer.defaults["lr"]
     logger.info("Learning rate: %f", lr)
     config["lr"] = lr
-    logger.info("Weight decay: %f", weight_decay)
-    config["weight_decay"] = weight_decay
-    config["adam_betas"] = tuple(adam_betas)
-    config["adam_eps"] = adam_eps
+    if isinstance(optimizer, BCD):
+        settings = {
+            key: value for key, value in optimizer.defaults.items() if key != "lr"
+        }
+        logger.info("Solver settings: %s", settings)
+        config.update(settings)
+    else:
+        weight_decay = optimizer.defaults.get("weight_decay", weight_decay)
+        logger.info("Weight decay: %f", weight_decay)
+        config["weight_decay"] = weight_decay
+        config["adam_betas"] = tuple(optimizer.defaults.get("betas", adam_betas))
+        config["adam_eps"] = optimizer.defaults.get("eps", adam_eps)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=num_epochs, eta_min=lr / 100
     )

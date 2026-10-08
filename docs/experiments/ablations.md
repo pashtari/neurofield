@@ -6,13 +6,13 @@ FUTON's four design choices, varied one at a time on the image task (the 24 Koda
 
 All six families at the default size. The number of parameters does not depend on the basis, so the columns are what each family costs and what it buys.
 
-| Basis | Orthogonal | Support | Smoothness | Train time (s) ↓ | PSNR (dB) ↑ |
+| Basis | Orthogonal | Support | Smoothness | Training time (s) ↓ | PSNR (dB) ↑ |
 | --- | --- | --- | --- | --- | --- |
-| Cosine | yes | global | $C^\infty$ | 8.4 | *38.36* ± 0.04 |
+| Cosine | yes | global | $C^\infty$ | 8.4 | _38.36_ ± 0.04 |
 | Chebyshev | weighted | global | $C^\infty$ | 8.6 | 37.52 ± 0.05 |
 | Legendre | yes | global | $C^\infty$ | 10.8 | 37.42 ± 0.05 |
 | Triangle | no | compact | $C^0$ | **5.4** | 37.54 ± 0.05 |
-| Lanczos | no | compact | $C^1$ | *5.7* | 38.22 ± 0.03 |
+| Lanczos | no | compact | $C^1$ | _5.7_ | 38.22 ± 0.03 |
 | Sinc | no | global | $C^\infty$ | 8.3 | **38.54** ± 0.04 |
 
 <figure markdown="span">
@@ -37,8 +37,8 @@ The two sizes of a FUTON, the number of components per axis and the CP rank, sca
 Parameters per cell, $R^2 + (h + w + 4) R + 3$ for $K = (h, w)$; the benchmark's model sits in the third row between β = 1/2 and β = 1, at R = 224.
 
 <figure markdown="span">
-  ![PSNR against β at each α](../assets/ablation_beta_sinc.svg){ width="520" }
-  ![PSNR against α at each β](../assets/ablation_alpha_sinc.svg){ width="520" }
+  ![PSNR against β at each α](../assets/ablation_rank_sinc.svg){ width="520" }
+  ![PSNR against α at each β](../assets/ablation_components_sinc.svg){ width="520" }
   <figcaption>PSNR against the rank factor β, one curve per component factor α; and the same runs against α, one curve per β. The 1/8 level of either is left to the table: its models are too small to matter and only compress the axis.</figcaption>
 </figure>
 
@@ -58,13 +58,13 @@ Rank is the lever that keeps paying: at every α, each doubling of β raises the
 
 A tensor-ring combiner against the CP one, at the default K, for both bases. A ring of rank $r$ has the size of a CP combiner of rank $r^2$; rank 15 (195,528 parameters) is the closest match to the CP model (194,435).
 
-| Combiner | Params (k) | FUTON-sinc time (s) ↓ | FUTON-sinc PSNR (dB) ↑ | FUTON-lanczos time (s) ↓ | FUTON-lanczos PSNR (dB) ↑ |
+| Combiner | #Params (k) | FUTON-sinc Training time (s) ↓ | FUTON-sinc PSNR (dB) ↑ | FUTON-lanczos Training time (s) ↓ | FUTON-lanczos PSNR (dB) ↑ |
 | --- | --- | --- | --- | --- | --- |
 | CP | 194.4 | **8.2** | **38.54** ± 0.05 | **6.1** | **38.20** ± 0.03 |
-| TR | 195.5 | *13.0* | *38.44* ± 0.04 | *10.8* | *38.08* ± 0.04 |
+| TR | 195.5 | _13.0_ | _38.44_ ± 0.04 | _10.8_ | _38.08_ ± 0.04 |
 
 <figure markdown="span">
-  ![Combiner convergence](../assets/ablation_tensor_net.svg){ width="520" }
+  ![Combiner convergence](../assets/ablation_combiner.svg){ width="520" }
 </figure>
 
 CP wins on both counts, by 0.1 dB and 1.6 to 1.8× in training time. The ring's $r \times r$ matrices per point cost more to contract than CP's $R$ products, and its output is only $r^2 = 225$ wide, which the decoder then has to close.
@@ -73,10 +73,10 @@ CP wins on both counts, by 0.1 dB and 1.6 to 1.8× in training time. The ring's 
 
 The paper's model has a linear decoder, which makes FUTON exactly a rank-$R$ CP model of the signal; the benchmarks use a one-layer MLP. The two are compared at equal size: replacing the MLP by a linear map frees 50,400 parameters, which the combiner spends on raising the rank from 224 to 302, 194,189 parameters against the benchmark's 194,435.
 
-| Decoder | Params (k) | FUTON-sinc time (s) ↓ | FUTON-sinc PSNR (dB) ↑ | FUTON-lanczos time (s) ↓ | FUTON-lanczos PSNR (dB) ↑ |
+| Decoder | #Params (k) | FUTON-sinc Training time (s) ↓ | FUTON-sinc PSNR (dB) ↑ | FUTON-lanczos Training time (s) ↓ | FUTON-lanczos PSNR (dB) ↑ |
 | --- | --- | --- | --- | --- | --- |
-| MLP, 1 hidden layer (R = 224) | 194.4 | *8.2* | **38.54** ± 0.16 | *6.2* | **38.20** ± 0.15 |
-| Linear (R = 302) | 194.2 | **7.6** | *30.40* ± 0.16 | **4.7** | *29.95* ± 0.15 |
+| MLP, 1 hidden layer (R = 224) | 194.4 | _8.2_ | **38.54** ± 0.16 | _6.2_ | **38.20** ± 0.15 |
+| Linear (R = 302) | 194.2 | **7.6** | _30.40_ ± 0.16 | **4.7** | _29.95_ ± 0.15 |
 
 <figure markdown="span">
   ![Decoder convergence](../assets/ablation_decoder.svg){ width="520" }

@@ -92,7 +92,7 @@ Most implicit neural representations hide their prior in the nonlinearity: sines
 
 Every model of a task has the same parameter budget, the hyperparameters of its authors' code, and a learning rate chosen on the task. Times are mean training times per signal on an A100: every model was retrained alone on an exclusive node, on two scenes for radiance fields and two images for super-resolution. See [Benchmarks](experiments/benchmarks.md) for every model, metric and error bar.
 
-| Task | Signals | Params | FUTON-sinc | FUTON-lanczos | Strongest baseline |
+| Task | Signals | #Params | FUTON-sinc | FUTON-lanczos | Strongest baseline |
 | --- | --- | --- | --- | --- | --- |
 | Images (Kodak) | 24 | 195k | **38.54 dB** in 8.1 s | 38.20 dB in **5.6 s** | Instant-NGP, 36.76 dB in 6.3 s |
 | Occupancy (Stanford) | 5 | 132k | **99.90 % IoU** in 10.3 s | **99.90 % IoU** in 7.4 s | Instant-NGP, 99.87 % in 10.3 s |
@@ -101,7 +101,7 @@ Every model of a task has the same parameter budget, the hyperparameters of its 
 
 <figure markdown="span">
   ![Kodak: convergence, training-time trade-off and throughput](assets/results_image.svg){ width="960" }
-  <figcaption>Kodak: PSNR against training time for FUTON and the strongest model of each family (the band is one within-image standard error); every model's final PSNR against its training time; and against its inference rate.</figcaption>
+  <figcaption>Kodak: PSNR against training time for FUTON and the strongest model of each family (the band is one within-image standard error); every model's final PSNR against its training time; and against its inference throughput.</figcaption>
 </figure>
 
 <figure markdown="span">

@@ -6,14 +6,16 @@ Usage:
     python scripts/report_paper.py --no-panels
 
 Writes results/, which holds the paper's figures and tables and nothing else:
-    legend.{pdf,pgf}                 the models' legend, shared by every figure
+    legend.{pdf,pgf}                 the models' legend, shared by every figure,
+                                     and super_resolution/legend.{pdf,pgf} the
+                                     same with that task's bicubic level
     <task>/convergence.{pdf,pgf}     quality against training time, for FUTON and
                                      the strongest model of each other family
-    <task>/tradeoff.{pdf,pgf}        every model's final quality against its
+    <task>/training_time.{pdf,pgf}   every model's final quality against its
                                      training time
     <task>/throughput.{pdf,pgf}      the same against its inference throughput
-    <task>/memory_training.{pdf,pgf}   the same against its peak training memory
-    <task>/memory_inference.{pdf,pgf}  and against its peak inference memory
+    <task>/training_memory.{pdf,pgf}   the same against its peak training memory
+    <task>/inference_memory.{pdf,pgf}  and against its peak inference memory
     <task>/table.{tex,md}            every model's size, training time and peak
                                      memory, inference throughput and peak memory,
                                      and final metrics, the averages with a paired
@@ -29,13 +31,17 @@ Writes results/, which holds the paper's figures and tables and nothing else:
                                      recomposing a figure needs no GPU
     ablation/basis.{tex,md,pdf,pgf}  every basis at the benchmark's size, as a
                                      table and as PSNR against training time
-    ablation/tensor_net.{tex,md,pdf,pgf}  the tensor-ring combiner against CP,
+    ablation/combiner.{tex,md,pdf,pgf}  the tensor-ring combiner against CP,
                                      for both bases, likewise
     ablation/decoder.{tex,md,pdf,pgf}  the linear decoder against the MLP,
                                      likewise
-    ablation/beta_<basis>.{pdf,pgf}  PSNR against the rank fraction at each
-                                     component fraction, and alpha_<basis> the
-                                     reverse, for the fractions 1/4 to 2
+    ablation/rank_<basis>.{pdf,pgf}  PSNR against the rank fraction at each
+                                     component fraction, and components_<basis>
+                                     the reverse, for the fractions 1/4 to 2
+
+Legends sit outside the data: a row of benchmark panels shares one legend
+strip below it, and a panel of its own carries a frameless legend above its
+axes, in as many columns as its width takes.
 
 Everything is sized for a NeurIPS page, 5.5 inches of 10pt Times: a panel is a
 third of the text width, a strip of magnifications spans it, and the image and
@@ -217,7 +223,7 @@ BAND = 1
 PAIRED = {"psnr", "ssim", "lpips"}
 # The type size and column gap of every table: NeurIPS's small, 9pt, at which
 # the image and super-resolution tables, nine columns, fit the text.
-TABLE_SIZE, TABLE_GAP = r"\small", "4pt"
+TABLE_SIZE, TABLE_GAP = r"\small", "3pt"
 
 # One colour per magnified region, so that a box and the row it magnifies are
 # read together: the red of the super-resolution literature, and a cyan that
@@ -257,6 +263,11 @@ UNITS = {"psnr": "{:.2f} dB", "iou": "{:.2f}%"}
 # axis as a fraction alpha of the pixels and the rank as a fraction beta of
 # the smaller count, both named as decimals in the model's name.
 STUDIES = ("basis", "components_rank", "tensor_net", "decoder")
+# A study's files are named for what it compares, where that differs from
+# the name of its config and logs.
+OUTPUTS = {"tensor_net": "combiner"}
+# The components study's figures, by the fraction on their x axis.
+FIGURES = {"alpha": "components", "beta": "rank"}
 GRID = re.compile(r"FUTON-(?P<basis>\w+)-a(?P<alpha>[\d.]+)-b(?P<beta>[\d.]+)$")
 FRACTIONS = {0.125: "1/8", 0.25: "1/4", 0.5: "1/2", 1.0: "1", 2.0: "2"}
 BASES = ("Cosine", "Chebyshev", "Legendre", "Triangle", "Lanczos", "Sinc")
@@ -273,7 +284,9 @@ SHOWN = (0.25, 0.5, 1.0, 2.0)
 # The room an ablation figure adds above its plot per row of its legend, in
 # inches, so that its plot is as large as a benchmark panel's.
 LEGEND_ROW = 0.15
-PARAMS = ("", "#Params (K)", None, 1)  # the column every table opens with
+# The column every table opens with. Thousands take the SI prefix k, since
+# K is the spectral resolution everywhere else.
+PARAMS = ("", "#Params (k)", None, 1)
 DASHES = ("", (4, 2), (1, 1.5))  # solid, dashed, dotted
 # The convergence of the three studies that get a curve, as label, colour and
 # dashes per model: a hue names the choice under study and the dashes the basis
@@ -692,21 +705,29 @@ def padded(values: pd.Series, fraction: float = 0.08) -> tuple[float, float]:
     return low - margin, high + margin
 
 
-def legend() -> plt.Figure:
-    """The featured models' lines and markers, and the other models' gray dot."""
+def legend(reference: bool = False) -> plt.Figure:
+    """The featured models' lines and markers, and the other models' gray dot.
+
+    One row, as wide as the text, to sit under a row of panels; ``reference``
+    adds the dotted level of the untrained reference, which super-resolution
+    draws.
+    """
     handles = [
         Line2D([], [], color=color, dashes=dashes or (None, None), marker="o",
                markerfacecolor=color if filled else "white", label=model)
         for model, (color, dashes, filled) in FEATURED.items()
     ] + [Line2D([], [], color=OTHERS, marker="o", ls="", label="Other models")]  # fmt: skip
+    if reference:
+        handles.append(Line2D([], [], color="0.4", ls=":", lw=0.8, label=REFERENCE))
     figure = plt.figure(figsize=(WIDTH, 0.2))
     figure.legend(
         handles=handles,
         loc="center",
         ncol=len(handles),
         frameon=False,
-        columnspacing=1.2,
-        handletextpad=0.5,
+        columnspacing=0.7 if reference else 1.2,
+        handlelength=1.2 if reference else 1.6,
+        handletextpad=0.4 if reference else 0.5,
     )
     return figure
 
@@ -875,6 +896,9 @@ def table(
         ]
 
     groups = [""] + [group for group, *_ in spec.values()]
+    # A title under a group is a lowercase phrase, "time (s)" under
+    # "Training", so that the flat header reads "Training time (s)"; LaTeX
+    # capitalizes it on its own row.
     titles = [index] + [title for _, title, _, _ in spec.values()]
     arrows = [""] + [
         "" if larger_is_better is None else "↑" if larger_is_better else "↓"
@@ -901,6 +925,7 @@ def table(
             first += width
         latex += [" & ".join(spans) + r" \\", "".join(rules)]
     names, units = zip(*(title.partition(" (")[::2] for title in titles))
+    names = [name[:1].upper() + name[1:] for name in names]
     units = [
         " ".join(filter(None, (f"({unit}" if unit else "", arrow)))
         for unit, arrow in zip(units, arrows)
@@ -922,7 +947,7 @@ def table(
             " & ".join(line(model, tex_mark, r"{{\scriptsize$\pm${}}}")) + r" \\"
         )
         markdown.append(
-            "| " + " | ".join(line(model, {1: "**{}**", 2: "_{}_"}, "±{}")) + " |"
+            "| " + " | ".join(line(model, {1: "**{}**", 2: "_{}_"}, " ± {}")) + " |"
         )
     latex += [r"\bottomrule", r"\end{tabular}"]
     tex = "\n".join(latex) + "\n"
@@ -986,13 +1011,13 @@ def tables(final: pd.DataFrame, task: str) -> dict[str, str]:
     # Every table opens with the size and the cost of each phase: training
     # time, as TensoRF, K-Planes and NeuRBF report it, inference throughput,
     # and the peak memory of both.
-    throughput = SPEED[task] if task == "nerf" else f"Throughput ({SPEED[task]})"
+    throughput = SPEED[task] if task == "nerf" else f"throughput ({SPEED[task]})"
     spec = {
         "parameters": PARAMS,
-        "time": ("Training", "Time (s)", False, 1),
-        "train_memory": ("Training", "Mem.", False, 2),
+        "time": ("Training", "time (s)", False, 1),
+        "train_memory": ("Training", "memory", False, 2),
         "speed": ("Inference", throughput, True, 1),
-        "infer_memory": ("Inference", "Mem.", False, 2),
+        "infer_memory": ("Inference", "memory", False, 2),
     }
     values = final.groupby("model")[list(spec)].mean()
     # Interpolations have no parameters and train nothing, so neither column
@@ -1001,7 +1026,7 @@ def tables(final: pd.DataFrame, task: str) -> dict[str, str]:
     for column in ("train_memory", "infer_memory"):  # in the unit of its axis
         unit, factor, decimals = memory_unit(values[column])
         values[column] *= factor
-        spec[column] = (spec[column][0], f"Mem. ({unit})", False, decimals)
+        spec[column] = (spec[column][0], f"memory ({unit})", False, decimals)
     errors = paired_error(final, metrics)
     if task in ("image", "super_resolution"):  # many images, so their mean alone
         for metric in metrics:
@@ -1613,7 +1638,7 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
                 handletextpad=0.3,
                 alignment="center",
             )
-            save(figure, out_dir / f"{axis}_{basis}")
+            save(figure, out_dir / f"{FIGURES[axis]}_{basis}")
 
 
 def study_curves(
@@ -1709,10 +1734,12 @@ def ablation(out_dir: Path) -> None:
     for name, (variants, index) in tabled.items():
         if studies[name]:
             table_of = variant_table(summarize(studies[name]), variants, index)
-            write(table_of, out_dir / name)
+            write(table_of, out_dir / OUTPUTS.get(name, name))
     for name, styles in CURVES.items():
         if studies[name]:
-            study_curves(curves(studies[name]), styles, out_dir / name)
+            study_curves(
+                curves(studies[name]), styles, out_dir / OUTPUTS.get(name, name)
+            )
 
 
 def main() -> None:
@@ -1751,11 +1778,13 @@ def main() -> None:
         if not final["model"].isin(FEATURED).any():  # a sweep still running
             print(f"{task}: no featured model has finished, so no figures yet")
             continue
+        if REFERENCE in final["model"].values:
+            save(legend(reference=True), out_dir / task / "legend")
         save(convergence(curve, task), out_dir / task / "convergence")
-        save(tradeoff(final, task), out_dir / task / "tradeoff")
+        save(tradeoff(final, task), out_dir / task / "training_time")
         save(tradeoff(final, task, "speed"), out_dir / task / "throughput")
-        save(tradeoff(final, task, "train_memory"), out_dir / task / "memory_training")
-        save(tradeoff(final, task, "infer_memory"), out_dir / task / "memory_inference")
+        save(tradeoff(final, task, "train_memory"), out_dir / task / "training_memory")
+        save(tradeoff(final, task, "infer_memory"), out_dir / task / "inference_memory")
         for signal in [] if args.no_panels else args.signals or EXAMPLES[task]:
             directory = panels(task, signal, runs, args.device, args.overwrite)
             if args.orbit and task == "nerf":

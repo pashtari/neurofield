@@ -195,7 +195,7 @@ style names the member, the stronger of a pair solid: SIREN and FINER share
 the periodic-activation hue, as do the two FUTON bases. A shared `legend.pdf`
 sits beside the task folders.
 
-The FUTON ablations go to `results/ablation/`: `basis`, `tensor_net` and
+The FUTON ablations go to `results/ablation/`: `basis`, `combiner` and
 `decoder` each as a table and a convergence plot, the tensor ring against CP
 and the linear decoder against the MLP for both bases, and the components
 study as PSNR against the rank fraction at each component fraction and the

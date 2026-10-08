@@ -84,11 +84,11 @@ python scripts/train_nerf.py --config configs/ablation-futon/components_nerf.yam
 
 ```
 results/
-├── legend.{pdf,pgf}                 the models' legend, shared by every figure
+├── legend.{pdf,pgf}                 the models' legend, shared by every figure; super_resolution/legend adds the bicubic level
 ├── <task>/convergence.{pdf,pgf}     quality against training time, FUTON and the strongest model of each family
-├── <task>/tradeoff.{pdf,pgf}        every model's final quality against its training time
+├── <task>/training_time.{pdf,pgf}   every model's final quality against its training time
 ├── <task>/throughput.{pdf,pgf}      the same against its inference throughput
-├── <task>/memory_{training,inference}.{pdf,pgf}  and against its peak memory in either phase
+├── <task>/{training,inference}_memory.{pdf,pgf}  and against its peak memory in either phase
 ├── <task>/table.{tex,md}            size, the cost of both phases and final metrics, every shape's and scene's too, best in bold, second underlined
 ├── <task>/qualitative_<signal>.pdf  the signal with two regions boxed and magnified for every featured model (bicubic for TensoRF in super-resolution)
 ├── <task>/panels/<signal>/          the renders those magnifications are cut from, rebuilt from the checkpoints

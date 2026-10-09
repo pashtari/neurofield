@@ -4,6 +4,7 @@ Usage:
     python scripts/report_paper.py
     python scripts/report_paper.py --tasks image --overwrite
     python scripts/report_paper.py --no-panels
+    python scripts/report_paper.py --tasks bound
 
 Writes results/, which holds the paper's figures and tables and nothing else:
     legend.{pdf,pgf}                 the models' legend, shared by every figure,
@@ -38,6 +39,19 @@ Writes results/, which holds the paper's figures and tables and nothing else:
     ablation/rank_<basis>.{pdf,pgf}  PSNR against the rank fraction at each
                                      component fraction, and components_<basis>
                                      the reverse, for the fractions 1/4 to 2
+    bound/gap.{pdf,pgf}              the error bound of FUTON with a linear
+                                     decoder, from scripts/futon_bound.py: PSNR
+                                     above Adam's at K = N/2 per rank, of the
+                                     ceiling and the certified FUTON in both
+                                     forms, and the region between them where
+                                     the best FUTON lies
+    bound/decomposition.{pdf,pgf}    Adam's error at K = N/2 split as the bound
+                                     splits it, per rank
+    bound/cost.{pdf,pgf}             seconds for the bound at five ranks, in
+                                     either form, against the five Adam runs
+    bound/table.{tex,md}             the means per setting, the smallest setting
+                                     certified for a target PSNR, the SVD form
+                                     and the optimizer checks
 
 Legends sit outside the data: a row of benchmark panels shares one legend
 strip below it, and a panel of its own carries a frameless legend above its
@@ -47,6 +61,9 @@ Everything is sized for a NeurIPS page, 5.5 inches of 10pt Times: a panel is a
 third of the text width, a strip of magnifications spans it, and the image and
 super-resolution tables fit it in small type. Ticks fall on whole or half
 numbers, and a band spans one standard error either side, as a table's ± does.
+
+--tasks picks what to build, of the four tasks, ablation and bound; a run
+builds them all by default.
 
 Tables mark the best value in bold and the second underlined. Drawing the panels
 needs the signals in data/ and a GPU; --no-panels leaves them out, and
@@ -81,7 +98,7 @@ from matplotlib.backends.backend_pgf import LatexError
 from matplotlib.lines import Line2D
 from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextPath
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import (
     FixedLocator,
     Locator,
@@ -90,6 +107,7 @@ from matplotlib.ticker import (
     StrMethodFormatter,
 )
 from PIL import Image
+from futon_bound import CHECKS, EPOCHS, LONGER, SWEEPS, psnr, sinc_only
 from train_common import ROOT, build, merge, resolve
 from train_super_resolution import INTERPOLATIONS, low_resolution
 
@@ -315,6 +333,14 @@ CURVES = {
         "FUTON-lanczos-linear": ("Linear, lanczos", PALETTE[1], DASHES[1]),
     },
 }
+
+# The error bound of FUTON with a linear decoder against FUTONs trained by Adam
+# (scripts/futon_bound.py): the datasets its figures and tables report, and the
+# PSNRs (dB) its design table finds the smallest setting for.
+BOUND_DATASETS = {"image": "Kodak", "occupancy": "Occupancy"}
+BOUND_TARGETS = {"image": (22, 24, 26, 28, 30), "occupancy": (19, 20, 21, 22, 23)}
+# What a run builds: the four tasks, the FUTON ablations and the error bound.
+PARTS = (*TASKS, "ablation", "bound")
 
 
 def style() -> None:
@@ -852,6 +878,19 @@ def tradeoff(final: pd.DataFrame, task: str, cost: str = "time") -> plt.Figure:
     return figure
 
 
+def spanning(groups: Sequence[str]) -> list[str]:
+    """A LaTeX header row with one centred cell over each run of equal groups,
+    and a rule under every named one."""
+    spans, rules, first = [], [], 1
+    for group, columns in groupby(groups):
+        width = len(list(columns))
+        spans.append(rf"\multicolumn{{{width}}}{{c}}{{{group}}}")
+        if group:
+            rules.append(rf"\cmidrule(lr){{{first}-{first + width - 1}}}")
+        first += width
+    return [" & ".join(spans) + r" \\", "".join(rules)]
+
+
 def table(
     values: pd.DataFrame,
     spec: dict,
@@ -916,14 +955,7 @@ def table(
     columns = "l" + "r" * (len(titles) - 1)
     latex = [rf"\begin{{tabular}}{{@{{}}{columns}@{{}}}}", r"\toprule"]
     if any(groups):  # a spanning header over each group's columns
-        spans, rules, first = [], [], 1
-        for group, columns in groupby(groups):
-            width = len(list(columns))
-            spans.append(rf"\multicolumn{{{width}}}{{c}}{{{group}}}")
-            if group:
-                rules.append(rf"\cmidrule(lr){{{first}-{first + width - 1}}}")
-            first += width
-        latex += [" & ".join(spans) + r" \\", "".join(rules)]
+        latex += spanning(groups)
     names, units = zip(*(title.partition(" (")[::2] for title in titles))
     names = [name[:1].upper() + name[1:] for name in names]
     units = [
@@ -1742,9 +1774,388 @@ def ablation(out_dir: Path) -> None:
             )
 
 
+def bound_records(task: str) -> pd.DataFrame:
+    """Every recorded sinc setting of the error bound on a task, one row each,
+    with PSNRs."""
+    rows = []
+    for path in sorted((ROOT / "logs" / "bound" / task).glob("*.json")):
+        record = json.loads(path.read_text())
+        rows += [
+            {"signal": record["signal"], **c} for c in sinc_only(record["configs"])
+        ]
+    frame = pd.DataFrame(rows).drop(columns="basis", errors="ignore")
+    for key in ("truncation", "lower", "upper", "certified", "adam", "closed"):
+        if key in frame:
+            frame[f"{key}_psnr"] = psnr(frame[key])
+    return frame
+
+
+def bound_means(frame: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+    """Means of the PSNRs ``keys`` per setting, each with one within-signal
+    standard error over the signals."""
+    long = pd.concat(
+        frame[["signal", "alpha", "R", key]]
+        .rename(columns={key: "psnr"})
+        .assign(model=key)
+        for key in keys
+    )
+    long["iteration"] = long["alpha"].astype(str) + long["R"].astype(str)
+    long["psnr"] = within_signal(long, "psnr")
+    return long.groupby(["alpha", "R", "model"])["psnr"].agg(["mean", "sem"])
+
+
+def bound_gap(frames: dict[str, pd.DataFrame]) -> plt.Figure:
+    """Each quantity's PSNR above Adam's at K = N/2, averaged over a dataset per
+    rank with one standard error of the difference, one panel per dataset: the
+    ceiling and the certified FUTON in its ALS and SVD forms, and between the
+    ALS form and the ceiling, the region where the best FUTON lies."""
+    lines = {
+        "lower": {"label": "Ceiling", "color": RAMP[-1], "ls": (0, (3.5, 1.5))},
+        "upper": {"label": "Certified (ALS)", "color": RAMP[2], "marker": "o"},
+        "closed": {"label": "Certified (SVD)", "color": RAMP[2], "marker": "o",
+                   "markerfacecolor": "white"},
+    }  # fmt: skip
+    region = {"color": RAMP[0], "alpha": 0.45, "linewidth": 0,
+              "label": "Best FUTON lies here"}  # fmt: skip
+    adam = {"color": "0.35", "lw": 0.8, "label": "Adam"}
+    width = {"lw": 1.0, "markersize": 3}
+    bar = {"capsize": 1.5, "elinewidth": 0.6, "capthick": 0.6, "zorder": 3}
+    figure, axes = plt.subplots(
+        1,
+        len(frames),
+        figsize=(len(frames) * SIZE[0], SIZE[1] + 2 * LEGEND_ROW),
+    )
+    for plot, (task, frame) in zip(axes, frames.items()):
+        g = frame[frame["alpha"] == 0.5]
+        above = {
+            key: (g[f"{key}_psnr"] - g["adam_psnr"])
+            .groupby(g["R"])
+            .agg(["mean", "sem"])
+            for key in lines
+        }
+        x = np.log2(above["upper"].index)
+        plot.fill_between(x, above["upper"]["mean"], above["lower"]["mean"], zorder=1,
+                          **region)  # fmt: skip
+        plot.axhline(0, zorder=2, **adam)
+        for key, style in lines.items():
+            plot.errorbar(x, above[key]["mean"], yerr=above[key]["sem"], **width,
+                          **bar, **style)  # fmt: skip
+        low = (above["closed"]["mean"] - above["closed"]["sem"]).min()
+        high = (above["lower"]["mean"] + above["lower"]["sem"]).max()
+        plot.set_xticks(x, [f"{rank}" for rank in above["upper"].index])
+        plot.set_ylim(low - 0.1 * (high - low), high + 0.1 * (high - low))
+        plot.yaxis.set_major_locator(Halves(count=6))
+        plot.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
+        plot.set_xlabel("CP rank $R$")
+        plot.set_title(BOUND_DATASETS[task], fontsize=8, pad=2)
+    axes[0].set_ylabel("PSNR above Adam (dB)")
+    # filled by column: the ceiling, the region and Adam, then the certified FUTON
+    handles = [
+        Line2D([], [], **width, **lines["lower"]),
+        Line2D([], [], **width, **lines["upper"]),
+        Patch(**region),
+        Line2D([], [], **width, **lines["closed"]),
+        Line2D([], [], **adam),
+    ]
+    figure.legend(handles=handles, loc="outside upper center", ncol=3, frameon=False,
+                  columnspacing=0.8, handlelength=1.8, handletextpad=0.4)  # fmt: skip
+    return figure
+
+
+def bound_decomposition(frames: dict[str, pd.DataFrame]) -> plt.Figure:
+    """Adam's error at K = N/2 split as the theorem splits it, in percent of
+    it averaged over a dataset per rank, one panel per dataset: the
+    truncation, which K forces; the rank's part up to the ceiling, which R
+    forces; the part from the ceiling to the certified FUTON, which the bound
+    leaves open; and the rest, which training leaves."""
+    parts = {"Truncation": RAMP[-1], "Rank, certain": RAMP[2],
+             "Rank, open": RAMP[0], "Left by training": "0.85"}  # fmt: skip
+    figure, axes = plt.subplots(
+        1,
+        len(frames),
+        figsize=(len(frames) * SIZE[0], SIZE[1] + LEGEND_ROW),
+    )
+    for plot, (task, frame) in zip(axes, frames.items()):
+        g = frame[frame["alpha"] == 0.5]
+        share = {
+            key: (100 * g[key] / g["adam"]).groupby(g["R"]).mean()
+            for key in ("truncation", "lower", "upper")
+        }
+        x = np.arange(len(share["upper"]))
+        levels = [0, share["truncation"], share["lower"], share["upper"], 100]
+        for color, base, level in zip(parts.values(), levels, levels[1:]):
+            plot.bar(x, level - base, bottom=base, width=0.6, color=color)
+        plot.set_xticks(x, [f"{rank}" for rank in share["upper"].index])
+        plot.set_ylim(0, 100)
+        plot.yaxis.set_major_locator(Halves())
+        plot.set_xlabel("CP rank $R$")
+        plot.set_title(BOUND_DATASETS[task], fontsize=8, pad=2)
+    axes[0].set_ylabel("Adam's error (%)")
+    handles = [Patch(color=color, label=label) for label, color in parts.items()]
+    figure.legend(handles=handles, loc="outside upper center", ncol=4, frameon=False,
+                  columnspacing=0.8, handlelength=1.2, handletextpad=0.4)  # fmt: skip
+    return figure
+
+
+def bound_cost(frames: dict[str, pd.DataFrame]) -> plt.Figure:
+    """Seconds per signal for the five ranks of each K: the bound with the
+    certified FUTON in its SVD form and in its ALS form, which do every rank
+    at once, against the five Adam runs, all averaged over the signals."""
+    bars = {"closed": (RAMP[0], "SVD"), "bound": (RAMP[3], "ALS"),
+            "adam": ("0.7", "Adam")}  # fmt: skip
+    figure, plot = plt.subplots(figsize=(SIZE[0], SIZE[1] + 2 * LEGEND_ROW))
+    labels, positions, centres, position = [], [], {}, 0.0
+    for task, frame in frames.items():
+        per_alpha = frame.groupby(["signal", "alpha"]).agg(
+            **{
+                key: (f"{key}_seconds", "sum" if key == "adam" else "first")
+                for key in bars
+            }
+        )
+        first = position
+        for alpha, group in per_alpha.groupby(level="alpha"):
+            width = 0.8 / len(bars)
+            for i, (key, (color, _)) in enumerate(bars.items()):
+                offset = (i - (len(bars) - 1) / 2) * width
+                plot.bar(position + offset, group[key].mean(), width, color=color)
+            labels.append(rf"$N/{FRACTIONS[alpha].split('/')[1]}$")
+            positions.append(position)
+            position += 1
+        centres[task] = (first + position - 1) / 2
+        position += 0.5
+    plot.set_yscale("log")
+    log_ticks(plot.yaxis)
+    plot.set_xticks(positions, labels)
+    plot.tick_params(axis="x", length=0)
+    plot.set(ylabel="Time (s)")
+    for task, centre in centres.items():
+        plot.text(centre, 1.0, BOUND_DATASETS[task], ha="center", va="bottom",
+                  transform=plot.get_xaxis_transform(), fontsize=7)  # fmt: skip
+    handles = [
+        Rectangle((0, 0), 1, 1, color=color, label=label)
+        for color, label in bars.values()
+    ]
+    figure.legend(handles=handles, loc="outside upper center", ncol=3, frameon=False,
+                  columnspacing=1.0, handlelength=1.0, handletextpad=0.4)  # fmt: skip
+    return figure
+
+
+def bound_design(frame: pd.DataFrame, targets) -> pd.DataFrame:
+    """For each target PSNR, the smallest setting the bound certifies for each
+    signal against the smallest Adam reaches, by parameter count."""
+    rows = []
+    for target in targets:
+        picks = []
+        for signal, group in frame.groupby("signal"):
+            certified = group[group["upper_psnr"] >= target]["parameters"]
+            trained = group[group["adam_psnr"] >= target]["parameters"]
+            possible = group[group["lower_psnr"] >= target]["parameters"]
+            picks.append((certified.min(), trained.min(), possible.min()))
+        picks = pd.DataFrame(picks, columns=["bound", "adam", "ceiling"])
+        both = picks.dropna(subset=["bound", "adam"])
+        rows.append({
+            "target": target,
+            "signals": len(picks),
+            "reached_adam": int(picks["adam"].notna().sum()),
+            "reached_bound": int(picks["bound"].notna().sum()),
+            "possible": int(picks["ceiling"].notna().sum()),
+            "same": float((both["bound"] == both["adam"]).mean()),
+            "smaller": float((both["bound"] < both["adam"]).mean()),
+            "larger": float((both["bound"] > both["adam"]).mean()),
+            "parameters_bound": picks["bound"].median(),
+            "parameters_adam": picks["adam"].median(),
+        })  # fmt: skip
+    return pd.DataFrame(rows)
+
+
+def bound_cell(mean: float, sem: float) -> str:
+    return f"{mean:.2f} ± {sem:.2f}"
+
+
+def bound_tables(frames: dict[str, pd.DataFrame]) -> list[dict]:
+    """The report's tables: means over each task's signals per setting, the
+    design for a target PSNR, the SVD form and the optimizer checks.
+    Each is a title, a note, a header of (group, title) pairs and rows of
+    text."""
+    built = []
+    columns = ["truncation_psnr", "upper_psnr", "lower_psnr", "adam_psnr"]
+    for task, frame in frames.items():
+        stats = bound_means(frame, columns)
+        seconds = frame.groupby(["alpha", "R"])[["bound_seconds", "adam_seconds"]]
+        rows = [
+            [f"N{FRACTIONS[alpha][1:]}", str(rank),
+             *(bound_cell(*stats.loc[(alpha, rank, key)]) for key in columns),
+             f"{row.bound_seconds:.1f}", f"{row.adam_seconds:.1f}"]
+            for (alpha, rank), row in seconds.mean().iterrows()
+        ]  # fmt: skip
+        built.append({
+            "title": f"{task} ({frame['signal'].nunique()} signals)",
+            "note": "Mean PSNR (dB) over the signals, ± one within-signal standard "
+                    "error; seconds for the bound at all ranks of a K and for one "
+                    "Adam run.",
+            "header": [("", "K"), ("", "R"), ("", "Truncation"),
+                       ("", "Certified (ALS)"), ("", "Ceiling"), ("", "Adam"),
+                       ("Seconds", "bound"), ("Seconds", "Adam")],
+            "rows": rows,
+        })  # fmt: skip
+    for task, frame in frames.items():
+        picks = bound_design(frame, BOUND_TARGETS[task])
+        bound = frame.groupby(["signal", "alpha"])["bound_seconds"].first()
+        bound = bound.groupby("signal").sum().mean()
+        adam = frame.groupby("signal")["adam_seconds"].sum().mean()
+        built.append({
+            "title": f"{task}: the smallest setting for a target PSNR",
+            "note": f"The bound takes {bound:.1f} s per signal for every setting, "
+                    f"Adam {adam:.0f} s.",
+            "header": [("", "Target (dB)"), ("Reached", "Adam"), ("Reached", "bound"),
+                       ("Reached", "possible"), ("Pick vs. oracle", "same"),
+                       ("Pick vs. oracle", "smaller"), ("Pick vs. oracle", "larger"),
+                       ("#Params (k)", "bound"), ("#Params (k)", "Adam")],
+            "rows": [[
+                f"{row.target:g}", f"{row.reached_adam:.0f}/{row.signals:.0f}",
+                f"{row.reached_bound:.0f}/{row.signals:.0f}",
+                f"{row.possible:.0f}/{row.signals:.0f}", f"{row.same:.0%}",
+                f"{row.smaller:.0%}", f"{row.larger:.0%}",
+                f"{row.parameters_bound / 1e3:.1f}", f"{row.parameters_adam / 1e3:.1f}",
+            ] for _, row in picks.iterrows()],
+        })  # fmt: skip
+    for task, frame in frames.items():
+        rows = []
+        for alpha, group in frame.groupby("alpha"):
+            per_signal = group.groupby("signal")
+            gap = group["upper_psnr"] - group["closed_psnr"]
+            rows.append([
+                f"N{FRACTIONS[alpha][1:]}",
+                f"{per_signal['closed_seconds'].first().mean():.2f}",
+                f"{per_signal['bound_seconds'].first().mean():.1f}",
+                f"{per_signal['adam_seconds'].sum().mean():.0f}",
+                f"{gap.median():.2f}", f"{gap.max():.2f}",
+            ])  # fmt: skip
+        built.append({
+            "title": f"{task}: the SVD form",
+            "note": "Seconds per signal for the five ranks, averaged over the signals: "
+                    "the bound with the certified FUTON in its SVD form (no sweeps), "
+                    "in its ALS form, and the five Adam runs; and how far below the "
+                    "ALS form the SVD form certifies, in dB, over the signals and "
+                    "ranks.",
+            "header": [("", "K"), ("Seconds", "SVD"), ("Seconds", "ALS"),
+                       ("Seconds", "Adam"), ("SVD, dB below ALS", "median"),
+                       ("SVD, dB below ALS", "max")],
+            "rows": rows,
+        })  # fmt: skip
+    methods = ["upper", "lower", "adam", "adam_longer", *(f"als_{s}" for s in SWEEPS)]
+    rows = []
+    for task, frame in frames.items():
+        path = ROOT / "logs" / "bound" / f"{task}_checks.json"
+        if not path.exists():
+            continue
+        runs = pd.DataFrame(json.loads(path.read_text()))
+        setting = frame[(frame["alpha"] == 0.5) & (frame["R"] == CHECKS[task])]
+        runs["adam"] = runs["signal"].map(setting.set_index("signal")["adam"])
+        long = runs.melt(id_vars="signal", value_vars=methods, var_name="model")
+        long = long.assign(psnr=psnr(long["value"]), iteration=0)
+        long["psnr"] = within_signal(long, "psnr")
+        stats = long.groupby("model")["psnr"].agg(["mean", "sem"])
+        rows.append([BOUND_DATASETS[task], str(CHECKS[task]),
+                     *(bound_cell(*stats.loc[key]) for key in methods)])  # fmt: skip
+    if rows:
+        built.append({
+            "title": "optimizer checks, K = N/2",
+            "note": "Mean PSNR (dB) over the signals, ± one within-signal standard "
+                    "error: the certified FUTON in its ALS form and the ceiling, Adam "
+                    f"at the benchmark's {EPOCHS} epochs and at {LONGER * EPOCHS:,}, "
+                    "and alternating least squares on the whole grid from a random "
+                    f"start, after {SWEEPS[0]} and {SWEEPS[1]} sweeps.",
+            "header": [("", "Dataset"), ("", "R"), ("", "Certified (ALS)"),
+                       ("", "Ceiling"), ("Adam", f"{EPOCHS} epochs"),
+                       ("Adam", f"{LONGER * EPOCHS:,} epochs"),
+                       ("ALS, random start", f"{SWEEPS[0]} sweeps"),
+                       ("ALS, random start", f"{SWEEPS[1]} sweeps")],
+            "rows": rows,
+        })  # fmt: skip
+    return built
+
+
+def bound_markdown(built: list[dict]) -> str:
+    """The tables in Markdown, one section each."""
+    lines = []
+    for table in built:
+        header = [", ".join(filter(None, pair)) for pair in table["header"]]
+        lines += [f"## {table['title']}", "", table["note"], "",
+                  "| " + " | ".join(header) + " |",
+                  "| --- |" + " ---: |" * (len(header) - 1)]  # fmt: skip
+        lines += ["| " + " | ".join(row) + " |" for row in table["rows"]]
+        lines.append("")
+    return "\n".join(lines)
+
+
+def bound_latex(built: list[dict]) -> str:
+    """The tables as booktabs tabulars, set as the benchmarks' tables are: a
+    spanning header over each group, titles centred over right-aligned
+    numbers, and the standard error in a smaller size after the mean."""
+
+    def tex(text: str) -> str:
+        text = re.sub(r" ± (\S+)", r"{\\scriptsize$\\pm$\1}", text)
+        text = re.sub(r"\bN/(\d)", r"$N/\1$", text)
+        for symbol, command in (
+            ("×", r"$\times$"),
+            ("–", "--"),
+            ("#", r"\#"),
+            ("%", r"\%"),
+        ):
+            text = text.replace(symbol, command)
+        return {"K": "$K$", "R": "$R$"}.get(text, text)
+
+    blocks = []
+    for table in built:
+        groups, titles = zip(*table["header"])
+        lines = [f"% {table['title']}",
+                 rf"{{{TABLE_SIZE}\setlength{{\tabcolsep}}{{{TABLE_GAP}}}%",
+                 rf"\begin{{tabular}}{{@{{}}l{'r' * (len(titles) - 1)}@{{}}}}",
+                 r"\toprule"]  # fmt: skip
+        if any(groups):
+            lines += spanning([tex(group) for group in groups])
+        titles = [tex(title) for title in titles]
+        names = [titles[0]] + [
+            rf"\multicolumn{{1}}{{c}}{{{title[:1].upper() + title[1:]}}}"
+            for title in titles[1:]
+        ]
+        lines += [" & ".join(names) + r" \\", r"\midrule"]
+        lines += [" & ".join(map(tex, row)) + r" \\" for row in table["rows"]]
+        lines += [r"\bottomrule", r"\end{tabular}}", ""]
+        blocks.append("\n".join(lines))
+    return "\n".join(blocks)
+
+
+def bound(out_dir: Path) -> None:
+    """The figures and tables of the error bound, from the records of
+    scripts/futon_bound.py."""
+    frames = {
+        task: bound_records(task)
+        for task in BOUND_DATASETS
+        if (ROOT / "logs" / "bound" / task).exists()
+    }
+    if not frames:
+        print("bound: no records under logs/bound, skipped")
+        return
+    save(bound_gap(frames), out_dir / "gap")
+    save(bound_decomposition(frames), out_dir / "decomposition")
+    save(bound_cost(frames), out_dir / "cost")
+    built = bound_tables(frames)
+    (out_dir / "table.md").write_text(bound_markdown(built))
+    (out_dir / "table.tex").write_text(bound_latex(built))
+    print(f"bound: written to {out_dir}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--tasks", nargs="+", default=list(TASKS), choices=list(TASKS))
+    parser.add_argument(
+        "--tasks",
+        nargs="+",
+        default=list(PARTS),
+        choices=PARTS,
+        help="what to build: tasks, the ablations, the error bound (default: all)",
+    )
     parser.add_argument(
         "--signals", nargs="+", help="signals to draw (default: the task's examples)"
     )
@@ -1769,7 +2180,7 @@ def main() -> None:
     style()
     out_dir = ROOT / "results"
     save(legend(), out_dir / "legend")
-    for task in args.tasks:
+    for task in (task for task in args.tasks if task in TASKS):
         if not (ROOT / "logs" / task).exists():
             print(f"{task}: no runs under logs/{task}, skipped")
             continue
@@ -1802,10 +2213,14 @@ def main() -> None:
             figure.savefig(out_dir / task / f"qualitative_{signal}.pdf", dpi=600)
             plt.close(figure)
         print(f"{task}: written to {out_dir / task}")
-    ablation(out_dir / "ablation")
-    # For the text: who reaches a high IoU, and how soon.
-    print(f"\ntime to {TARGET:g}% IoU on every shape (s):")
-    print(time_to_target(load("occupancy")[2]).dropna().sort_values().to_string())
+    if "ablation" in args.tasks:
+        ablation(out_dir / "ablation")
+    if "bound" in args.tasks:
+        bound(out_dir / "bound")
+    if "occupancy" in args.tasks and (ROOT / "logs" / "occupancy").exists():
+        # For the text: who reaches a high IoU, and how soon.
+        print(f"\ntime to {TARGET:g}% IoU on every shape (s):")
+        print(time_to_target(load("occupancy")[2]).dropna().sort_values().to_string())
 
 
 if __name__ == "__main__":

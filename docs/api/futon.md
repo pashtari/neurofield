@@ -8,6 +8,12 @@ The [FUTON concept page](../concepts/futon.md) derives the model; this page is t
 
 ::: neurofield.models.futon_solvers
 
+## Error bounds
+
+The [error bound page](../concepts/error-bound.md) states and proves the theorem these functions compute.
+
+::: neurofield.models.futon_bounds
+
 ## Row-contiguous sparse matrices
 
 ::: neurofield.models.rcs_matrix

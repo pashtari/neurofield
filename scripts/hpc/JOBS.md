@@ -66,6 +66,29 @@ scripts/hpc/train.sh --clusters=accelgor --time=1:00:00 nerf \
   --config configs/ablation-futon/components_nerf.yaml --data data/nerf/blender/lego
 ```
 
+## Error bound
+
+`scripts/futon_bound.py` runs the error-bound study of the docs' concepts
+page on the 24 Kodak images and the 5 occupancy volumes: in the sinc basis,
+at every spectral resolution and rank, it bounds the best error of FUTON
+with a linear decoder, builds the FUTON that attains the upper bound, and
+trains the same FUTON with Adam; then, on every signal at K = N/2 and one
+rank, it trains for five times the epochs and runs least squares on the
+whole grid. It records into `logs/bound/` and is resumable. One A100 does it
+all in about two hours, bound and Adam in the same job, so that the cost of
+the two is compared under the same conditions.
+
+```bash
+sbatch --clusters=accelgor --gpus-per-node=1 --cpus-per-task=8 \
+  --time=3:00:00 --chdir=$VSC_DATA/projects/neurofield \
+  --job-name=nf-bound --output=logs/slurm/%x-%j.out --wrap \
+  "source $VSC_DATA/venvs/neurofield-env/bin/activate && python scripts/futon_bound.py"
+```
+
+Pull `logs/bound/` with `pull_logs.sh` and run `python scripts/report_paper.py
+--tasks bound` locally for the figures and tables in `results/bound/`, which
+take seconds and no GPU.
+
 ## Overrides
 
 To try another value for one model, override it and send the runs elsewhere:

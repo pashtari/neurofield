@@ -116,6 +116,7 @@ nav:
       - concepts/index.md
       - Neural fields in NeuroField: concepts/neural-fields.md
       - FUTON: concepts/futon.md
+      - Error bound of FUTON: concepts/error-bound.md
       - The model zoo: concepts/models.md
       - Conventions: concepts/conventions.md
   - Tutorials:

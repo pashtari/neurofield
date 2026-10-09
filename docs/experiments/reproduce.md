@@ -92,12 +92,14 @@ results/
 ├── <task>/table.{tex,md}            size, the cost of both phases and final metrics, every shape's and scene's too, best in bold, second underlined
 ├── <task>/qualitative_<signal>.pdf  the signal with two regions boxed and magnified for every featured model (bicubic for TensoRF in super-resolution)
 ├── <task>/panels/<signal>/          the renders those magnifications are cut from, rebuilt from the checkpoints
-└── ablation/                        a table and a convergence plot each for the bases, the combiners and the decoders, and PSNR against each fraction
+├── ablation/                        a table and a convergence plot each for the bases, the combiners and the decoders, and PSNR against each fraction
+└── bound/                           the error bound against trained FUTONs, from the records of scripts/futon_bound.py: figures and tables of the bound page
 ```
 
 ```bash
 python scripts/report_paper.py                          # everything
 python scripts/report_paper.py --tasks image --overwrite  # redraw one task's panels
+python scripts/report_paper.py --tasks bound            # only the error bound; --tasks also takes ablation
 python scripts/report_paper.py --no-panels              # tables and plots only, no GPU needed
 python scripts/report_paper.py --orbit 60               # plus an orbit GIF of each NeRF model
 ```

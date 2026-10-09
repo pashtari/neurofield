@@ -122,6 +122,8 @@ Coordinates live in [-1, 1] on every axis, targets in the model's output range, 
 
 **Solvers**: `nf.LeastSquares` and `nf.MultiplicativeUpdate` fit a FUTON with a linear decoder by block coordinate descent, through the same `nf.train` call, in place of Adam.
 
+**Error bounds**: `nf.futon_bound` brackets the best error a FUTON with a linear decoder can reach on a sampled signal at a given spectral resolution and rank, and builds a FUTON that attains the upper bound; the [theorem and its proof](https://pashtari.github.io/neurofield/concepts/error-bound/) are in the docs.
+
 **Image compression** (`nf.compression`): a FUTON codec, PIL codecs as baselines, and one function that measures any codec.
 
 ```python

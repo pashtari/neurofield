@@ -67,7 +67,7 @@ occupancy = eval_set.postprocess(volume.cpu())       # (1, D, H, W) in {0, 1}
 eval_set.save(occupancy, "thai_statue_futon")         # thai_statue_futon.dae and .png
 ```
 
-The render needs a display, which compute nodes lack; that is why the call above and the benchmark script pass `save_reconstruction=False` and rebuild meshes from `checkpoint.pt` afterwards (`nf.evaluate(model, eval_set, ckpt_path=..., log_dir=...)` on a workstation).
+The render needs a display, which headless machines lack; that is why the call above and the benchmark script pass `save_reconstruction=False` and rebuild meshes from `checkpoint.pt` afterwards (`nf.evaluate(model, eval_set, ckpt_path=..., log_dir=...)` on a workstation).
 
 ## The benchmark script
 

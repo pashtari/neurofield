@@ -1,6 +1,6 @@
 # Ablations
 
-FUTON's four design choices, varied one at a time on the image task (the 24 Kodak images at 768 × 512, 2000 epochs on 10 % of the pixels per step, learning rate 3e-2), plus one supplementary study on a radiance field. Unless stated, the default model is the benchmark's: K = (H/2, W/2) components per axis, 384 × 256 for a landscape image, CP rank 224, a one-layer MLP decoder, 194,435 parameters. The configs are in `configs/ablation-futon/`, and every table and plot here is in `results/ablation/`. The times are the sweeps' own, from shared A100 nodes, so they compare the variants with each other rather than with the benchmark tables.
+FUTON's four design choices, varied one at a time on the image task (the 24 Kodak images at 768 × 512, 2000 epochs on 10 % of the pixels per step, learning rate 3e-2), plus one supplementary study on a radiance field. Unless stated, the default model is the benchmark's: K = (H/2, W/2) components per axis, 384 × 256 for a landscape image, CP rank 224, a one-layer MLP decoder, 194,435 parameters. The configs are in `configs/ablation-futon/`, and every table and plot here is in `results/ablation/`. The times are the sweeps' own, on A100s that ran other jobs beside them, so they compare the variants with each other rather than with the benchmark tables.
 
 ## Basis
 

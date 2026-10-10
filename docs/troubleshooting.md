@@ -40,11 +40,11 @@ The fused kernels for local bases need Triton, which ships with PyTorch's Linux 
 **`ModuleNotFoundError: trimesh` (or `mcubes`, `open3d`).**
 Meshes as occupancy volumes, mesh export and offscreen rendering need the `3d` extra: `pip install -e ".[3d]"`. Point clouds in `.xyz` format load without it.
 
-**Rendering a mesh hangs or fails on a compute node.**
+**Rendering a mesh hangs or fails on a machine without a display.**
 `OccupancyCoordinateDataset.save` renders through a hidden Open3D window, which needs a display. Train with `save_reconstruction=False` (as `scripts/train_occupancy.py` does) and rebuild the mesh from `checkpoint.pt` on a machine with a display.
 
 **LPIPS downloads weights on first use.**
-`nf.lpips` loads the VGG (or AlexNet) backbone through torchmetrics, which fetches the weights once. On nodes without internet, run one evaluation on the login node first, with the same cache directory.
+`nf.lpips` loads the VGG (or AlexNet) backbone through torchmetrics, which fetches the weights once. On a machine without internet access, run one evaluation on a connected one first, with the same cache directory.
 
 ## Experiments
 
@@ -55,7 +55,7 @@ Runs are keyed by model name inside the log directory. After changing a model's 
 Learning rates in the configs come from the grid {3e-1, 1e-1, 3e-2, 1e-2, 3e-3, 1e-3, 3e-4, 1e-4}, and the comments beside them record what the neighbours cost. Sine networks (SIREN, FINER) are the most sensitive; FUTON tolerates 1e-2 to 3e-2 across tasks.
 
 **Training times differ from the tables.**
-The recorded times were measured on one A100 in jobs that shared their nodes; the [reproduction page](experiments/reproduce.md) explains how `scripts/profile_speed.py` times inference in one exclusive job.
+Times recorded during a sweep carry whatever else ran beside it; the tables take theirs from runs of each model alone on an A100, and the [reproduction page](experiments/reproduce.md) explains how `scripts/profile_speed.py` times inference the same way.
 
 ## Models
 

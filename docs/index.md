@@ -90,7 +90,7 @@ Most implicit neural representations hide their prior in the nonlinearity: sines
 
 ## Results at a glance
 
-Every model of a task has the same parameter budget, the hyperparameters of its authors' code, and a learning rate chosen on the task. Times are mean training times per signal on an A100: every model was retrained alone on an exclusive node, on two scenes for radiance fields and two images for super-resolution. See [Benchmarks](experiments/benchmarks.md) for every model, metric and error bar.
+Every model of a task has the same parameter budget, the hyperparameters of its authors' code, and a learning rate chosen on the task. Times are mean training times per signal on an A100, every model retrained alone on the GPU, on two scenes for radiance fields and two images for super-resolution. See [Benchmarks](experiments/benchmarks.md) for every model, metric and error bar.
 
 | Task | Signals | #Params | FUTON-sinc | FUTON-lanczos | Strongest baseline |
 | --- | --- | --- | --- | --- | --- |

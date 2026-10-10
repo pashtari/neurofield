@@ -141,6 +141,16 @@ models:
       output_activation: tanh
     train: {lr: 3.0e-2}
 
+  F-INR:  # Vemuri et al. (WACV 2026): SIREN axes and a tensor train, its pick for shapes
+    class: FINR
+    kwargs:
+      rank: 15
+      hidden_features: 128  # deviation: 256 in the reference; 128 meets the budget
+      hidden_layers: 3
+      mode: tt
+      output_activation: tanh
+    train: {lr: 1.0e-4}
+
   FUTON-sinc:
     class: FUTON
     kwargs:

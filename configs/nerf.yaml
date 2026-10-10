@@ -131,6 +131,16 @@ models:
       hidden_layers: 2
     train: {lr: 3.0e-2}
 
+  F-INR:  # Vemuri et al. (WACV 2026): SIREN axes and a tensor train, its pick for NeRF
+    class: FINR
+    kwargs:
+      rank: 6
+      hidden_features: 64
+      hidden_layers: 3
+      mode: tt
+      grid: false  # samples along rays are scattered
+    train: {lr: 1.0e-4}
+
   FUTON-sinc:
     class: FUTON
     kwargs:

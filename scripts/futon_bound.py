@@ -119,6 +119,18 @@ def train(model: nf.FUTON, data, device, lr: float = LR, epochs: int = EPOCHS,
     return time.perf_counter() - start
 
 
+def warm_up(task: str, device: torch.device) -> None:
+    """A bound and a short Adam run on the task's first signal, untimed, so
+    that no timed one pays for setting up kernels and libraries."""
+    name = TASKS[task]["signals"][0]
+    full = dataset(task, name)
+    sizes, channels = list(full.target.shape[:-1]), full.target.shape[-1]
+    features = features_of(futon(sizes, channels, 0.125, 1), sizes, device)
+    nf.futon_bound(full.target.to(device), features, [8], sweeps=5)
+    train_data = dataset(task, name, TASKS[task]["subsample"])
+    train(futon(sizes, channels, 0.125, 8), train_data, device, epochs=10)
+
+
 def sinc_only(configs: list[dict]) -> list[dict]:
     """The records' sinc settings; an earlier study also ran a lanczos basis."""
     return [c for c in configs if c.get("basis", "sinc") == "sinc"]
@@ -229,6 +241,7 @@ def main() -> None:
     args = parser.parse_args()
     device = torch.device(args.device)
     for task in args.tasks:
+        warm_up(task, device)
         for name in args.signals or TASKS[task]["signals"]:
             if name in TASKS[task]["signals"]:
                 run(task, name, device)

@@ -20,7 +20,7 @@ The truncation is computed exactly. The best CP misfit is bracketed: from below 
 | Ceiling | no FUTON of resolution $K$ and rank $R$ exceeds it |
 | Certified | the *certified FUTON*, built from the samples without training, reaches it exactly |
 
-The best FUTON of that size lies between the certified PSNR and the ceiling. <!-- summary -->SUMMARY<!-- /summary --> `nf.futon_bound` computes all three numbers and the certified FUTON from a sampled signal.
+The best FUTON of that size lies between the certified PSNR and the ceiling. <!-- summary -->On the benchmark's Kodak images and occupancy volumes, no trained FUTON passes its ceiling, in any of 348 settings, and the certified FUTON matches or beats Adam's in 99 % of them.<!-- /summary --> `nf.futon_bound` computes all three numbers and the certified FUTON from a sampled signal.
 
 ## Setting
 
@@ -199,20 +199,20 @@ bound.initialize(model)                      # the certified FUTON, error bound.
 
 The experiment asks three things of the bound: that it holds, that it is tight enough to stand in for training, and that it costs little enough to be worth computing first. Every number below is a dataset's: a mean, a count or a quantile over its signals.
 
-**Setup.** The 24 Kodak images ($C = 2$, $D = 3$, $768 \times 512$ or $512 \times 768$ pixels in $[-1, 1]$) and the five Stanford occupancy volumes of the benchmark ($C = 3$, $D = 1$, occupancy $\pm 1$ on grids of 78 to 231 voxels per side), in the benchmark's sinc basis at $K_c = \alpha N_c$ for $\alpha \in \{1/8, 1/4, 1/2\}$, with $R \in \{16, 32, \dots, 256\}$ on images and $R \in \{32, 64, \dots, 512\}$ on volumes: 435 settings. For each, `nf.futon_bound` gives the truncation, the ceiling and the certified FUTON $\hat{\boldsymbol{\theta}}$ in its ALS form, and times its SVD form; the same FUTON is trained with Adam under the benchmark's protocol: 2000 epochs on 10 % of the points per step for images and 1 % for volumes, learning rate $3 \cdot 10^{-2}$ annealed to a hundredth, one seed. Errors are mean squared errors on the whole grid, and PSNR is $10 \log_{10}(4 / \mathrm{MSE})$ for signals in $[-1, 1]$. Everything ran on one NVIDIA A100, the bound and Adam in the same job, so they are timed alike; `python scripts/futon_bound.py` reproduces it, and `python scripts/report_paper.py --tasks bound` writes the figures and tables to `results/bound/`.
+**Setup.** The 24 Kodak images ($C = 2$, $D = 3$, $768 \times 512$ or $512 \times 768$ pixels in $[-1, 1]$) and the five Stanford occupancy volumes of the benchmark ($C = 3$, $D = 1$, occupancy $\pm 1$ on grids of 78 to 231 voxels per side), in the benchmark's sinc basis at $K_c = \alpha N_c$ for $\alpha \in \{1/8, 1/4, 1/2\}$, with $R \in \{32, 64, 128, 256\}$: 348 settings, and for the cost alone also at $K = N$. For each, `nf.futon_bound` gives the truncation, the ceiling and the certified FUTON $\hat{\boldsymbol{\theta}}$ in its ALS form, and times its SVD form; the same FUTON is trained with Adam under the benchmark's protocol: 2000 epochs on 10 % of the points per step for images and 1 % for volumes, learning rate $3 \cdot 10^{-2}$ annealed to a hundredth, one seed. Errors are mean squared errors on the whole grid, and PSNR is $10 \log_{10}(4 / \mathrm{MSE})$ for signals in $[-1, 1]$. Everything ran on one NVIDIA A100, the bound and Adam in the same job, so they are timed alike; `python scripts/futon_bound.py` reproduces it, and `python scripts/report_paper.py --tasks bound` writes the figures and tables to `results/bound/`.
 
-**The bounds hold.** No trained FUTON passes its ceiling, in any of the 435 settings: none has an error below the lower bound. Every certified FUTON, evaluated by its own forward pass in float32, has the error of its upper bound to within a relative $3 \cdot 10^{-7}$. The tests check the same identities in float64 to $10^{-9}$, as well as the Eckart–Young case, the invariance within a span and a DCT cross-check.
+**The bounds hold.** No trained FUTON passes its ceiling, in any of the 348 settings: none has an error below the lower bound. Every certified FUTON, evaluated by its own forward pass in float32, has the error of its upper bound to within a relative $3 \cdot 10^{-7}$. The tests check the same identities in float64 to $10^{-9}$, as well as the Eckart–Young case, the invariance within a span and a DCT cross-check.
 
-**Images: the best FUTON is pinned down.** For an image's coefficient tensor, of order three, the interval that holds the best PSNR has a median width of 0.10 dB over the images and settings, and 90 % of the intervals are narrower than 0.37 dB. It widens with $K$, to a median of 0.03, 0.09 and 0.20 dB at $N/8$, $N/4$ and $N/2$, and closes as $R$ reaches the truncation. Adam's FUTON lies at or below the certified one in 97 % of the image settings, by 0.07 dB on average and up to 0.44 dB; where it is ahead, it is by at most 0.04 dB.
+**Images: the best FUTON is pinned down.** For an image's coefficient tensor, of order three, the interval that holds the best PSNR has a median width of 0.09 dB over the images and settings, and 90 % of the intervals are narrower than 0.34 dB. It widens with $K$, to a median of 0.01, 0.08 and 0.19 dB at $N/8$, $N/4$ and $N/2$, and closes as $R$ reaches the truncation. Adam's FUTON lies at or below the certified one in 98 % of the image settings, by 0.07 dB on average and up to 0.44 dB; where it is ahead, it is by at most 0.01 dB.
 
-**Volumes: the upper bound is the certificate.** With three axes, the matricization bound falls back to the truncation once $R$ passes the largest $K_c$, the regime where a best CP approximation may not exist: the interval has a median width of 0.22 dB at $N/4$ and 2.37 dB at $N/2$, while at $N/8$ the truncation alone caps the volumes at 17.9 dB on average, which the certified FUTON reaches to within 0.01 dB from $R = 128$ on. The certified FUTON beats Adam's in every setting, by 0.25 dB on average and up to 0.71 dB.
+**Volumes: the upper bound is the certificate.** With three axes, every flattening of the coefficient tensor has rank at most the largest $K_c$, so once $R$ passes it the lower bound falls back to the truncation, although the CP misfit itself need not vanish: the interval has a median width of 0.86 dB at $N/4$ and 3.11 dB at $N/2$, while at $N/8$ the truncation alone caps the volumes at 17.9 dB on average, which the certified FUTON reaches to within 0.01 dB from $R = 128$ on. The certified FUTON beats Adam's in every setting, by 0.27 dB on average and up to 0.70 dB.
 
 <figure markdown="span">
   ![PSNR above Adam](../assets/bound_gap.svg){ width="620" }
   <figcaption>PSNR above Adam's at K = N/2, averaged over the 24 Kodak images (left) and the five occupancy volumes (right), per rank, with one standard error of the difference: the ceiling; the certified FUTON in its ALS form (filled) and its SVD form (open); and, shaded between the ALS form and the ceiling, the region where the best FUTON lies.</figcaption>
 </figure>
 
-**Where Adam's error goes.** The theorem splits every FUTON's error into the truncation and the CP misfit, and the bounds split the misfit further: up to the ceiling it is forced by $R$, from the ceiling to the certified FUTON it is open, and beyond the certified FUTON it is left by training. As shares of Adam's error at $K = N/2$, the truncation is 21 % at $R = 16$ and 94 % at $R = 256$ on Kodak, the part that $R$ forces falls from 72 % to 1 %, at most 6 % stays open, and training leaves 1 to 4 %. On the volumes the truncation is 26 % to 78 %, the open part reaches 50 %, since the lower bound falls to the truncation there, and training leaves 8 to 13 %.
+**Where Adam's error goes.** The theorem splits every FUTON's error into the truncation and the CP misfit, and the bounds split the misfit further: up to the ceiling it is forced by $R$, from the ceiling to the certified FUTON it is open, and beyond the certified FUTON it is left by training. As shares of Adam's error at $K = N/2$, the truncation is 31 % at $R = 32$ and 94 % at $R = 256$ on Kodak, the part that $R$ forces falls from 60 % to 1 %, at most 6 % stays open, and training leaves 2 to 4 %. On the volumes the truncation is 26 % to 62 %, the open part reaches 50 %, since the lower bound falls to the truncation there, and training leaves 8 to 13 %.
 
 <figure markdown="span">
   ![Where Adam's error goes](../assets/bound_decomposition.svg){ width="620" }
@@ -232,35 +232,37 @@ Five times the epochs raise Adam's mean from 26.81 to 26.92 dB on Kodak and from
 
 | Dataset | Target (dB) | Reached by Adam, the bound, the ceiling | Same pick | Smaller | Larger | #Params, bound (k) | #Params, Adam (k) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Kodak | 22 | 24/24, 24/24, 24/24 | 96% | 4% | 0% | 2.6 | 2.6 |
+| Kodak | 22 | 24/24, 24/24, 24/24 | 96% | 4% | 0% | 5.2 | 5.2 |
 |  | 24 | 23/24, 23/24, 23/24 | 96% | 4% | 0% | 5.2 | 5.2 |
 |  | 26 | 22/24, 22/24, 22/24 | 100% | 0% | 0% | 20.7 | 20.7 |
 |  | 28 | 17/24, 18/24, 18/24 | 88% | 12% | 0% | 41.2 | 41.2 |
 |  | 30 | 13/24, 13/24, 13/24 | 85% | 15% | 0% | 82.3 | 82.3 |
 | Occupancy | 19 | 5/5, 5/5, 5/5 | 100% | 0% | 0% | 7.0 | 7.0 |
 |  | 20 | 5/5, 5/5, 5/5 | 80% | 20% | 0% | 7.7 | 14.1 |
-|  | 21 | 5/5, 5/5, 5/5 | 100% | 0% | 0% | 28.4 | 28.4 |
-|  | 22 | 4/5, 4/5, 4/5 | 75% | 25% | 0% | 44.0 | 59.6 |
-|  | 23 | 3/5, 3/5, 4/5 | 67% | 33% | 0% | 56.8 | 62.5 |
+|  | 21 | 4/5, 4/5, 5/5 | 100% | 0% | 0% | 22.0 | 22.0 |
+|  | 22 | 3/5, 3/5, 4/5 | 67% | 33% | 0% | 31.2 | 56.8 |
+|  | 23 | 2/5, 3/5, 4/5 | 100% | 0% | 0% | 56.8 | 50.4 |
 
-The bound's pick is never larger than the oracle's, and it is smaller for the harder targets (12 % of the images at 28 dB and 15 % at 30 dB, 25 % of the volumes at 22 dB and 33 % at 23 dB), and it comes with its model; it certifies 28 dB on 18 of the 24 images, Adam reaches it on 17. Read along a budget instead, the certified mean ranks the spectral resolutions as Adam's results do at every parameter count: on Kodak, $N/8$ is best up to about 5k parameters, $N/4$ from about 10k to 21k, and $N/2$ from about 41k; on the volumes, $N/8$ is best up to about 2k parameters, $N/4$ from about 4k to 16k, and $N/2$ from about 31k. Either way, the $(K, R)$ split is settled before anything is trained.
+The bound's pick is never larger than the oracle's, and it is smaller for the harder targets (12 % of the images at 28 dB and 15 % at 30 dB, 33 % of the volumes at 22 dB and 0 % at 23 dB), and it comes with its model; it certifies 28 dB on 18 of the 24 images, Adam reaches it on 17 and it certifies 23 dB on 3 of the 5 volumes, Adam reaches it on 2. Read along a budget instead, the certified mean ranks the spectral resolutions as Adam's results do at every parameter count: on Kodak, $N/8$ is best up to about 5k parameters, $N/4$ from about 10k to 21k, and $N/2$ from about 41k; on the volumes, $N/8$ is best up to about 2k parameters, $N/4$ from about 4k to 16k, and $N/2$ from about 31k. Either way, the $(K, R)$ split is settled before anything is trained.
 
-**Cost.** On the A100, the bound for all five ranks of a $K$ takes 0.8 to 3 s per image and 1 to 23 s per volume on average, up to 78 s on the largest volume at $N/2$, where one Adam run takes 5 to 6 s and 6 to 8 s. Over every setting of a signal, the design above costs 7 s per image against 82 s of training, and 27 s per volume against 95 s: 3 to 12 times less, with the model that reaches the target included.
+**Cost.** On the A100, the bound for all four ranks of a $K$ takes 0.6 to 5 s per image and 1 to 24 s per volume on average, up to 23 s on the largest volume at $N$, where one Adam run takes 4 to 11 s and 5 to 9 s. Over every setting of a signal, the design above costs 5 s per image against 64 s of training, and 28 s per volume against 73 s: 3 to 12 times less, with the model that reaches the target included.
 
-**The SVD form.** The refinement is what costs. The certified FUTON in its SVD form, `sweeps=0`, takes 0.03 to 0.3 s per image and 0.02 to 0.5 s per volume for all five ranks, 1 % and 2 % of one Adam run per rank, and certifies a median 0.25 dB below the ALS form on images (at most 1.54 dB) and 1.25 dB below on volumes (at most 2.27 dB). It is a valid certificate at once; the ALS form is the tighter one.
+**The SVD form.** The refinement is what costs. The certified FUTON in its SVD form, `sweeps=0`, takes 0.03 to 5 s per image and 0.08 to 6 s per volume for all four ranks, 34 % and 25 % of one Adam run per rank, and certifies a median 0.33 dB below the ALS form on images (at most 4.03 dB) and 1.54 dB below on volumes (at most 2.56 dB). It is a valid certificate at once; the ALS form is the tighter one.
 
 | Dataset | $K$ | SVD (s) | ALS (s) | Adam (s) | SVD, dB below ALS: median | max |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Kodak | N/8 | 0.03 | 0.8 | 21 | 0.07 | 1.41 |
-|  | N/4 | 0.13 | 3.3 | 34 | 0.23 | 1.49 |
-|  | N/2 | 0.27 | 2.6 | 26 | 0.44 | 1.54 |
-| Occupancy | N/8 | 0.02 | 1.2 | 31 | 0.07 | 1.47 |
-|  | N/4 | 0.06 | 3.1 | 31 | 1.22 | 1.99 |
-|  | N/2 | 0.46 | 22.9 | 33 | 1.67 | 2.27 |
+| Kodak | N/8 | 0.03 | 0.6 | 17 | 0.03 | 1.02 |
+|  | N/4 | 5.48 | 2.6 | 24 | 0.16 | 1.27 |
+|  | N/2 | 0.26 | 2.2 | 23 | 0.44 | 1.50 |
+|  | N | 1.20 | 5.1 | 27 | 0.99 | 4.03 |
+| Occupancy | N/8 | 0.20 | 1.2 | 23 | 0.19 | 1.47 |
+|  | N/4 | 0.08 | 3.0 | 25 | 1.29 | 1.99 |
+|  | N/2 | 3.53 | 23.6 | 25 | 1.69 | 2.27 |
+|  | N | 5.50 | 13.2 | 28 | 1.93 | 2.56 |
 
 <figure markdown="span">
-  ![Seconds for five ranks](../assets/bound_cost.svg){ width="300" }
-  <figcaption>Seconds per signal for the five ranks of each spectral resolution, averaged over each dataset: the bound with the certified FUTON in its SVD form and in its ALS form, and the five Adam runs.</figcaption>
+  ![Seconds per K](../assets/bound_cost.svg){ width="300" }
+  <figcaption>Seconds per signal for the four ranks of each spectral resolution, from N/8 to N, averaged over each dataset: the bound with the certified FUTON in its SVD form and in its ALS form, and the four Adam runs.</figcaption>
 </figure>
 
 ## Related results

@@ -217,8 +217,8 @@ TENSORF = {
 REFERENCE = "Bicubic"
 ROWS = (
     "Nearest", "Bilinear", "Bicubic", "DIP",
-    "RFF", "PE-MLP", "MFN", "SIREN", "Gauss", "WIRE", "FINER", "Instant-NGP",
-    "TensoRF", "GA-Planes", "FUTON-sinc", "FUTON-lanczos",
+    "RFF", "PE-MLP", "MFN", "SIREN", "FreSh", "Gauss", "WIRE", "FINER",
+    "Instant-NGP", "TensoRF", "GA-Planes", "F-INR", "FUTON-sinc", "FUTON-lanczos",
 )  # fmt: skip
 # Metric axes are linear, which needs no explaining; IoU saturates, so its
 # curves start here instead, which the ticks show plainly.
@@ -1956,7 +1956,7 @@ def bound_cost(frames: dict[str, pd.DataFrame]) -> plt.Figure:
             for i, (key, (color, _)) in enumerate(bars.items()):
                 offset = (i - (len(bars) - 1) / 2) * width
                 plot.bar(position + offset, group[key].mean(), width, color=color)
-            labels.append(f"${resolution(alpha)}$")
+            labels.append(FRACTIONS[alpha])
             positions.append(position)
             position += 1
         centres[task] = (first + position - 1) / 2
@@ -1965,7 +1965,7 @@ def bound_cost(frames: dict[str, pd.DataFrame]) -> plt.Figure:
     log_ticks(plot.yaxis)
     plot.set_xticks(positions, labels)
     plot.tick_params(axis="x", length=0)
-    plot.set(ylabel="Time (s)")
+    plot.set(xlabel="$K / N$", ylabel="Time (s)")
     for task, centre in centres.items():
         plot.text(centre, 1.0, BOUND_DATASETS[task], ha="center", va="bottom",
                   transform=plot.get_xaxis_transform(), fontsize=7)  # fmt: skip

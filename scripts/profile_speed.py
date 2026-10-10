@@ -13,6 +13,7 @@ even; an exclusive allocation makes it clean:
 Usage:
     python scripts/profile_speed.py
     python scripts/profile_speed.py --tasks image occupancy --repeats 9
+    python scripts/profile_speed.py --models F-INR FreSh  # add models to the files
 
 Writes logs/speed/<task>.json: each model's median inference time over the
 repeats, the points it evaluated, the rate those give, and the most memory one
@@ -145,6 +146,9 @@ def main() -> None:
     parser.add_argument(
         "--tasks", nargs="+", default=list(INFERENCE), choices=list(INFERENCE)
     )
+    parser.add_argument(
+        "--models", nargs="+", help="profile these alone, kept beside the others"
+    )
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--log-dir", type=Path, default=report.ROOT / "logs")
     parser.add_argument("--out-dir", type=Path, default=report.ROOT / "logs" / "speed")
@@ -163,10 +167,13 @@ def main() -> None:
         runs = [
             run
             for run in report.read(args.log_dir / task, task)
-            if run["data"] == signal and "interpolation" not in run["setup"]
+            if run["data"] == signal
+            and "interpolation" not in run["setup"]
+            and (args.models is None or run["model"] in args.models)
         ]
         print(f"\n{task} ({signal}), median of {args.repeats}")
-        measured = {}
+        out = args.out_dir / f"{task}.json"
+        measured = json.loads(out.read_text()) if args.models and out.exists() else {}
         for run in sorted(runs, key=lambda run: run["model"]):
             call, points = INFERENCE[task](run, path, device)
             memory = peak_memory(call, device)
@@ -184,9 +191,7 @@ def main() -> None:
                 flush=True,
             )
             torch.cuda.empty_cache()
-        (args.out_dir / f"{task}.json").write_text(
-            json.dumps(measured, indent=2, sort_keys=True) + "\n"
-        )
+        out.write_text(json.dumps(measured, indent=2, sort_keys=True) + "\n")
     print(f"\nWritten to {args.out_dir}")
 
 

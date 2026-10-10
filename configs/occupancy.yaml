@@ -71,7 +71,7 @@ models:
       hidden_layers: 3
       omega: 30.0  # the later layers; FreSh picks the first one's
       output_activation: tanh
-    train: {lr: 1.0e-3}
+    train: {lr: 1.0e-3}  # 3e-4 costs 0.4 IoU points and 3e-3 25
 
   Gauss:  # FINER benchmark
     class: Gauss
@@ -153,15 +153,17 @@ models:
       output_activation: tanh
     train: {lr: 3.0e-2}
 
-  F-INR:  # Vemuri et al. (WACV 2026): SIREN axes and a tensor train, its pick for shapes
+  F-INR:  # Vemuri et al. (WACV 2026): SIREN axes and CP
     class: FINR
     kwargs:
-      rank: 15
+      # tuned: the tensor train its authors pick for shapes, rank 15 at the same
+      # size, is 0.1 IoU points lower
+      rank: 83
       hidden_features: 128  # deviation: 256 in the reference; 128 meets the budget
       hidden_layers: 3
-      mode: tt
+      mode: cp
       output_activation: tanh
-    train: {lr: 1.0e-4}
+    train: {lr: 1.0e-3}  # 3e-4 costs 1.6 IoU points and 3e-3 14
 
   FUTON-sinc:
     class: FUTON

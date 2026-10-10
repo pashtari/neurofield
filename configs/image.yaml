@@ -135,11 +135,13 @@ models:
     class: FINR
     kwargs:
       rank: 140  # W + 1: a channel's rank is at most W + 1 in 2D
-      hidden_features: 139  # deviation: 256 in the reference; 139 meets the budget
+      # deviation: 256 in the reference; 139 meets the budget, and rank 64 at
+      # width 177, the same size, is 0.8 dB worse
+      hidden_features: 139
       hidden_layers: 3
       mode: cp
       output_activation: tanh
-    train: {lr: 1.0e-4}
+    train: {lr: 1.0e-3}  # 3e-4 costs 1.3 dB and 3e-3 6 dB; the reference's 1e-4, 3 dB
 
   FUTON-sinc:
     class: FUTON

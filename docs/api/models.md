@@ -18,6 +18,10 @@ The architectures of the [model zoo](../concepts/models.md), all re-exported at 
 
 ::: neurofield.models.siren
 
+## FreSh
+
+::: neurofield.models.fresh
+
 ## Gauss
 
 ::: neurofield.models.gauss
@@ -49,6 +53,10 @@ The architectures of the [model zoo](../concepts/models.md), all re-exported at 
 ## TensoRF
 
 ::: neurofield.models.tensorf
+
+## F-INR
+
+::: neurofield.models.finr
 
 ## Grid INR
 

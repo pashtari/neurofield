@@ -65,6 +65,15 @@ models:
       omega: 30.0
     train: {lr: 3.0e-4}  # on lego, 1e-4 costs 0.4 dB and 1e-3 about 4
 
+  FreSh:  # Kania et al. (ICLR 2025): the SIREN above, its first omega chosen per scene
+    class: SIREN
+    fresh: {size: 32}  # FreSh's spectrum shells for SIREN radiance fields
+    kwargs:
+      hidden_features: 180
+      hidden_layers: 3
+      omega: 30.0  # the later layers; FreSh picks the first one's
+    train: {lr: 3.0e-4}
+
   Gauss:
     class: Gauss
     kwargs:

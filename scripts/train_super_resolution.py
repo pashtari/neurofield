@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from PIL import Image
 from torch import Tensor, nn
 from torchvision.transforms.functional import pil_to_tensor
-from train_common import ROOT, build, record, resolve, run, warm_up
+from train_common import ROOT, build, fresh, on_grid, record, resolve, run, warm_up
 
 import neurofield as nf
 
@@ -225,6 +225,7 @@ def fit(
         resize_matrix(height, height // scale, device),
         resize_matrix(width, width // scale, device),
     ]
+    search = None
     if model_class is nf.DIPSkip:
         network = model_class(**kwargs)
         eval_dataset = nf.DIPImageDataset(
@@ -240,6 +241,15 @@ def fit(
         network(train_dataset.input[None].to(device)).float().sum().backward()
         network.zero_grad(set_to_none=True)
     else:
+        # FreSh sees what the field is fitted to: the low-resolution image.
+        observed = nf.ImageCoordinateDataset(low_resolution(path, scale))
+        search = fresh(
+            model,
+            kwargs,
+            [observed.target.to(device)],
+            lambda kw: on_grid(model_class(2, 3, **kw), observed, device),
+            train["seed"],
+        )
         network = model_class(in_features=2, out_features=3, **kwargs)
         train_dataset = SuperResolutionDataset(
             low_resolution(path, scale),
@@ -262,7 +272,7 @@ def fit(
         log_dir=out,
         **train,
     )
-    return record(res, model, res["history"][-1]["eval"])
+    return record(res, model, res["history"][-1]["eval"], search)
 
 
 if __name__ == "__main__":

@@ -61,6 +61,18 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-3}  # the SDF lr 1e-4 is too slow for 2000 epochs; 3e-3 is worse
 
+  FreSh:  # Kania et al. (ICLR 2025): the SIREN above, its first omega chosen per shape
+    class: SIREN
+    # Our adaptation: the 3D spectrum of the occupancy grid, in 32 shells, since
+    # FreSh's shells stop at half the smallest side, 78 voxels on lucy.
+    fresh: {size: 32}
+    kwargs:
+      hidden_features: 256
+      hidden_layers: 3
+      omega: 30.0  # the later layers; FreSh picks the first one's
+      output_activation: tanh
+    train: {lr: 1.0e-3}
+
   Gauss:  # FINER benchmark
     class: Gauss
     kwargs:

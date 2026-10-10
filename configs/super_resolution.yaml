@@ -90,6 +90,18 @@ models:
       output_activation: tanh
     train: {lr: 1.0e-4}  # every higher rate diverges
 
+  FreSh:  # Kania et al. (ICLR 2025): SIREN, its first omega chosen per image
+    class: SIREN
+    # Our adaptation: the spectrum of the low-resolution image, the only view
+    # of the signal the field gets.
+    fresh: {size: 64}
+    kwargs:
+      hidden_features: 407
+      hidden_layers: 4
+      omega: 30.0  # the later layers, as in FreSh; the SIREN above tunes one for all
+      output_activation: tanh
+    train: {lr: 1.0e-4}
+
   Gauss:  # FINER image benchmark
     class: Gauss
     kwargs:

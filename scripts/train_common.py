@@ -25,6 +25,7 @@ import gc
 import json
 import re
 import sys
+import time
 import traceback
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -104,15 +105,62 @@ def assign(config: dict[str, Any], setting: str) -> None:
 
 
 def record(
-    res: dict[str, Any], model: dict[str, Any], metrics: dict[str, Any]
+    res: dict[str, Any],
+    model: dict[str, Any],
+    metrics: dict[str, Any],
+    fresh: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Combine a training result, model setup, and final metrics for saving."""
-    return {
-        **res["config"],
-        "setup": model,
-        "metrics": metrics,
-        "history": res["history"],
-    }
+    """Combine a training result, model setup, and final metrics for saving.
+
+    A FreSh search (see :func:`fresh`) is part of training: its seconds are
+    added to every elapsed time, and its choice is saved with the run.
+    """
+    history = res["history"]
+    if fresh is not None:
+        history = [
+            entry | {"elapsed": entry["elapsed"] + fresh["seconds"]}
+            for entry in history
+        ]
+    out = {**res["config"], "setup": model, "metrics": metrics, "history": history}
+    if fresh is not None:
+        out["fresh"] = fresh
+    return out
+
+
+def fresh(
+    model: dict[str, Any],
+    kwargs: dict[str, Any],
+    targets: Sequence[torch.Tensor],
+    render: Callable[[dict[str, Any]], torch.Tensor],
+    seed: int,
+) -> dict[str, Any] | None:
+    """FreSh (Kania et al., ICLR 2025) for a model whose config holds ``fresh``.
+
+    ``model["fresh"]`` holds arguments of :func:`neurofield.fresh_select`, and
+    ``render(kwargs)`` builds an untrained model from constructor arguments
+    and returns its output on the signal's grid. Sets ``kwargs["first_omega"]``
+    to the choice and reseeds with ``seed``, so that the model's own
+    initialization is a run's without the search. Returns the choice, every
+    candidate's score and the seconds the search took, or ``None`` for a
+    model without ``fresh``.
+    """
+    if "fresh" not in model:
+        return None
+    start = time.perf_counter()
+    omega, scores = nf.fresh_select(
+        targets,
+        lambda omega: render({**kwargs, "first_omega": omega}),
+        **model["fresh"],
+    )
+    kwargs["first_omega"] = omega
+    torch.manual_seed(seed)
+    return {"omega": omega, "seconds": time.perf_counter() - start, "scores": scores}
+
+
+def on_grid(model: torch.nn.Module, dataset: Any, device: torch.device) -> torch.Tensor:
+    """A model's output at every point of a dataset's grid, shaped like its target."""
+    output = nf.chunked_inference(model, dataset.input, chunk_size=2**18, device=device)
+    return output.reshape(dataset.target.shape)
 
 
 def warm_up(model: torch.nn.Module, dataset: Any, device: torch.device) -> None:

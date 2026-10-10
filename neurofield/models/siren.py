@@ -44,6 +44,9 @@ class SIREN(MLP):
         hidden_features: Hidden width.
         hidden_layers: Number of sine layers; must be at least one.
         omega: Frequency multiplier in every sine layer.
+        first_omega: Frequency of the first sine layer alone, the one
+            :func:`neurofield.fresh_select` chooses; ``None`` keeps ``omega``.
+            The later layers' initialization follows ``omega``.
         output_activation: Optional callable applied to the output.
     """
 
@@ -54,6 +57,7 @@ class SIREN(MLP):
         hidden_features: int,
         hidden_layers: int = 3,
         omega: float = 30.0,
+        first_omega: float | None = None,
         output_activation: Callable[[Tensor], Tensor] | None = None,
     ) -> None:
         super().__init__(
@@ -65,11 +69,14 @@ class SIREN(MLP):
             omega=omega,
             output_activation=output_activation,
         )
+        self.omega = omega
+        if first_omega is not None:
+            self.layers[0].omega = first_omega
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         """Initialize weights with SIREN bounds, leaving biases unchanged."""
-        _siren_init_(self.layers, self.layers[0].omega)
+        _siren_init_(self.layers, self.omega)
 
 
 @torch.no_grad()

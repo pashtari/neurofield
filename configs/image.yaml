@@ -65,7 +65,7 @@ models:
       hidden_layers: 4
       omega: 30.0  # the later layers; FreSh picks the first one's
       output_activation: tanh
-    train: {lr: 1.0e-3}
+    train: {lr: 1.0e-3}  # 3e-4 costs 1.6 dB; 3e-3 diverges
 
   Gauss:  # FINER image benchmark
     class: Gauss

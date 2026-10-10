@@ -40,17 +40,19 @@ import torch
 import neurofield as nf
 from train_common import ROOT
 
+# K = N (alpha 1) enters the cost alone, to show how the bound's time grows with
+# K; every other result is at K <= N/2.
 TASKS = {
     "image": {
         "signals": [f"kodim{i:02d}" for i in range(1, 25)],
-        "alphas": (0.125, 0.25, 0.5),
-        "ranks": (16, 32, 64, 128, 256),
+        "alphas": (0.125, 0.25, 0.5, 1.0),
+        "ranks": (32, 64, 128, 256),
         "subsample": 0.1,
     },
     "occupancy": {
         "signals": ["armadillo", "dragon", "happy_buddha", "lucy", "thai_statue"],
-        "alphas": (0.125, 0.25, 0.5),
-        "ranks": (32, 64, 128, 256, 512),
+        "alphas": (0.125, 0.25, 0.5, 1.0),
+        "ranks": (32, 64, 128, 256),
         "subsample": 0.01,
     },
 }

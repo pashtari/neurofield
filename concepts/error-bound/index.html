@@ -1,0 +1,2456 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="NeuroField, neural fields in PyTorch, with FUTON, a Fourier tensor network for implicit neural representations.">
+      
+      
+      
+        <link rel="canonical" href="https://pashtari.github.io/neurofield/concepts/error-bound/">
+      
+      
+        <link rel="prev" href="../futon/">
+      
+      
+        <link rel="next" href="../models/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Error bound of FUTON - NeuroField</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#error-bound-of-futon" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NeuroField" class="md-header__button md-logo" aria-label="NeuroField" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NeuroField
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Error bound of FUTON
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pashtari/neurofield" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pashtari/neurofield
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../experiments/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Experiments
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../troubleshooting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Troubleshooting
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NeuroField" class="md-nav__button md-logo" aria-label="NeuroField" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    NeuroField
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pashtari/neurofield" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pashtari/neurofield
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your first neural field
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../neural-fields/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural fields in NeuroField
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FUTON
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error bound of FUTON
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error bound of FUTON
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#in-short" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In short
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#theorem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Theorem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proof" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proof
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The model zoo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../tutorials/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/image/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fitting an image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/occupancy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Occupancy volumes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/nerf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Radiance fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/compression/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image compression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/custom-components/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../experiments/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Experiments
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../experiments/benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../experiments/ablations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ablations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../experiments/reproduce/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducing the paper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../api/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    neurofield.models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/futon/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FUTON, bases and combiners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training and evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and losses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/quantization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quantization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/compression/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nerf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Radiance fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#in-short" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In short
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#theorem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Theorem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proof" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proof
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="error-bound-of-futon">Error bound of FUTON<a class="headerlink" href="#error-bound-of-futon" title="Permanent link">&para;</a></h1>
+<p>How well can a FUTON of a given size fit a signal, before it is trained? For FUTON with a linear decoder the question has an exact answer, computed from the signal's samples before any training, and the answer comes with a model: a FUTON that fits the signal at least as well as promised, built without training.</p>
+<h2 id="in-short">In short<a class="headerlink" href="#in-short" title="Permanent link">&para;</a></h2>
+<p>FUTON's error splits exactly into two parts, as the sides of a right triangle do:</p>
+<div class="arithmatex">\[
+\lVert \boldsymbol{s} - \boldsymbol{s}^{\text{futon}} \rVert^2 = \underbrace{\lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2}_{\text{truncation}} + \underbrace{\lVert \boldsymbol{\mathcal{Z}} - \boldsymbol{\mathcal{Y}} \rVert_F^2}_{\text{CP misfit}} .
+\]</div>
+<p>The <em>truncation</em> is what the basis cannot express at spectral resolution <span class="arithmatex">\(K\)</span>: the error of the best approximation <span class="arithmatex">\(\hat{\boldsymbol{s}}_K\)</span> of the signal by the basis, which no rank lowers. The <em>CP misfit</em> is what rank <span class="arithmatex">\(R\)</span> cannot express of the rest: the distance between the signal's coefficient tensor <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span> and the model's, <span class="arithmatex">\(\boldsymbol{\mathcal{Y}}\)</span>, whose CP rank is at most <span class="arithmatex">\(R\)</span>. Training changes only the second part, and its best value is the best rank-<span class="arithmatex">\(R\)</span> approximation error of <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span>.</p>
+<p>The truncation is computed exactly. The best CP misfit is bracketed: from below by the singular values of the coefficient tensor flattened into matrices, and from above by an explicit rank-<span class="arithmatex">\(R\)</span> tensor built by nested SVDs, whose FUTON has exactly that error. In PSNR, every spectral resolution <span class="arithmatex">\(K\)</span> and rank <span class="arithmatex">\(R\)</span> thus get three numbers:</p>
+<table>
+<thead>
+<tr>
+<th>PSNR</th>
+<th>What it guarantees</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Truncation</td>
+<td>no FUTON of resolution <span class="arithmatex">\(K\)</span> exceeds it, at any rank</td>
+</tr>
+<tr>
+<td>Ceiling</td>
+<td>no FUTON of resolution <span class="arithmatex">\(K\)</span> and rank <span class="arithmatex">\(R\)</span> exceeds it</td>
+</tr>
+<tr>
+<td>Certified</td>
+<td>the <em>certified FUTON</em>, built from the samples without training, reaches it exactly</td>
+</tr>
+</tbody>
+</table>
+<p>The best FUTON of that size lies between the certified PSNR and the ceiling. <!-- summary -->On the benchmark's Kodak images and occupancy volumes, no trained FUTON passes its ceiling, in any of 348 settings, and the certified FUTON matches or beats Adam's in 99 % of them.<!-- /summary --> <code>nf.futon_bound</code> computes all three numbers and the certified FUTON from a sampled signal.</p>
+<h2 id="setting">Setting<a class="headerlink" href="#setting" title="Permanent link">&para;</a></h2>
+<p>Equations and definitions are numbered as in the paper.</p>
+<p><strong>Signal and norm.</strong> A signal <span class="arithmatex">\(\boldsymbol{s}\)</span> maps a product domain <span class="arithmatex">\(\mathbb{X} = \mathbb{X}_1 \times \cdots \times \mathbb{X}_C\)</span> to <span class="arithmatex">\(\mathbb{R}^D\)</span>, and is measured by</p>
+<div class="arithmatex">\[
+\lVert \boldsymbol{f} \rVert^2 = \sum_{d=1}^{D} \int_{\mathbb{X}} f_d^2 \, d\mu , \qquad \mu = \mu_1 \otimes \cdots \otimes \mu_C ,
+\]</div>
+<p>with the matching inner product <span class="arithmatex">\(\langle \cdot, \cdot \rangle\)</span>. Two cases matter. On the unit cube with the Lebesgue measure, this is the paper's <span class="arithmatex">\(L^2([0,1]^C)\)</span>. On a sampling grid, <span class="arithmatex">\(N_c\)</span> points on axis <span class="arithmatex">\(c\)</span> with <span class="arithmatex">\(\mu_c\)</span> uniform on them, <span class="arithmatex">\(\lVert \boldsymbol{f} \rVert^2\)</span> is <span class="arithmatex">\(D\)</span> times the mean squared error over the <span class="arithmatex">\(N = \prod_c N_c\)</span> points, the error FUTON is trained and evaluated on. Everything below holds in both cases; in the second, it is computed from the samples.</p>
+<p><strong>Basis.</strong> Axis <span class="arithmatex">\(c\)</span> uses <span class="arithmatex">\(K_c\)</span> functions, collected in <span class="arithmatex">\(\boldsymbol{\varphi}(x_c) \in \mathbb{R}^{K_c}\)</span>. They need not be orthonormal: the paper's cosine basis is orthonormal on <span class="arithmatex">\([0, 1]\)</span>, the sinc and Lanczos bases of the benchmarks are not. The products <span class="arithmatex">\(\phi_{\boldsymbol{k}}(\boldsymbol{x}) = \prod_c \varphi_{k_c}(x_c)\)</span> span the space <span class="arithmatex">\(\mathbb{V}_K\)</span> of what the basis can express at resolution <span class="arithmatex">\(K = (K_1, \dots, K_C)\)</span>, and <span class="arithmatex">\(\hat{\boldsymbol{s}}_K\)</span> is the orthogonal projection of <span class="arithmatex">\(\boldsymbol{s}\)</span> onto it, channel by channel: the best approximation of the signal in <span class="arithmatex">\(\mathbb{V}_K\)</span>, which for an orthonormal basis is the partial sum of its generalized Fourier series (Eq. 4).</p>
+<p><strong>Coefficients.</strong> The theorem reads the signal through its coefficients in an orthonormal basis of <span class="arithmatex">\(\mathbb{V}_K\)</span>, which one factorization per axis provides. The Gram matrix of axis <span class="arithmatex">\(c\)</span> factors as</p>
+<div class="arithmatex">\[
+\boldsymbol{G}_c = \int_{\mathbb{X}_c} \boldsymbol{\varphi}(x_c) \, \boldsymbol{\varphi}(x_c)^\top d\mu_c = \boldsymbol{B}_c^\top \boldsymbol{B}_c , \qquad \boldsymbol{B}_c \in \mathbb{R}^{K'_c \times K_c}, \quad K'_c = \operatorname{rank} \boldsymbol{G}_c ,
+\]</div>
+<p>with <span class="arithmatex">\(\boldsymbol{B}_c\)</span> of full row rank, so that <span class="arithmatex">\(\boldsymbol{B}_c \boldsymbol{B}_c^{+} = \boldsymbol{I}\)</span> for its pseudoinverse. Then <span class="arithmatex">\(\boldsymbol{\psi}(x_c) = (\boldsymbol{B}_c^{+})^\top \boldsymbol{\varphi}(x_c) \in \mathbb{R}^{K'_c}\)</span> is an orthonormal basis of the same span (Lemma 1), and the signal's coefficients in the products of these functions form the <em>coefficient tensor</em></p>
+<div class="arithmatex">\[
+\boldsymbol{\mathcal{Z}} \in \mathbb{R}^{K'_1 \times \cdots \times K'_C \times D}, \qquad z_{\boldsymbol{j} d} = \Big\langle s_d , \prod_{c=1}^{C} \psi_{j_c}(x_c) \Big\rangle .
+\]</div>
+<p>For an orthonormal basis, <span class="arithmatex">\(\boldsymbol{B}_c = \boldsymbol{I}\)</span> and <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span> holds the generalized Fourier coefficients of Eq. (4).</p>
+<p><strong>Model.</strong> FUTON with a linear decoder (Eqs. 9 to 11) is</p>
+<div class="arithmatex">\[
+\boldsymbol{s}^{\text{futon}}_{\boldsymbol{\theta}}(\boldsymbol{x}) = \boldsymbol{V} \big( \boldsymbol{U}^{(1)\top} \boldsymbol{\varphi}(x_1) \odot \cdots \odot \boldsymbol{U}^{(C)\top} \boldsymbol{\varphi}(x_C) \big),
+\]</div>
+<p>with parameters <span class="arithmatex">\(\boldsymbol{\theta} = (\boldsymbol{U}^{(1)}, \dots, \boldsymbol{U}^{(C)}, \boldsymbol{V})\)</span>, <span class="arithmatex">\(\boldsymbol{U}^{(c)} \in \mathbb{R}^{K_c \times R}\)</span> and <span class="arithmatex">\(\boldsymbol{V} \in \mathbb{R}^{D \times R}\)</span>, and no bias or output activation. Its weights form the CP tensor</p>
+<div class="arithmatex">\[
+[\![ \boldsymbol{U}^{(1)}, \dots, \boldsymbol{U}^{(C)}, \boldsymbol{V} ]\!] = \sum_{r=1}^{R} \boldsymbol{u}^{(1)}_r \otimes \cdots \otimes \boldsymbol{u}^{(C)}_r \otimes \boldsymbol{v}_r \in \mathbb{R}^{K_1 \times \cdots \times K_C \times D}
+\]</div>
+<p>of rank at most <span class="arithmatex">\(R\)</span>, whose last factor is the decoder.</p>
+<p><strong>Rank-<span class="arithmatex">\(R\)</span> error.</strong> For a tensor <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span>, <span class="arithmatex">\(\varepsilon_R(\boldsymbol{\mathcal{Z}}) = \inf \{ \lVert \boldsymbol{\mathcal{Z}} - \boldsymbol{\mathcal{Y}} \rVert_F : \operatorname{rank} \boldsymbol{\mathcal{Y}} \le R \}\)</span> is the error of its best rank-<span class="arithmatex">\(R\)</span> CP approximation (rank as in Definition 17). For a nonempty proper subset <span class="arithmatex">\(\mathbb{S}\)</span> of its modes, <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}_{\langle \mathbb{S} \rangle}\)</span> is the matrix that flattens it with the modes in <span class="arithmatex">\(\mathbb{S}\)</span> as rows and the others as columns (Definition 11 for one mode), and <span class="arithmatex">\(\sigma_1 \ge \sigma_2 \ge \cdots\)</span> are its singular values.</p>
+<h2 id="theorem">Theorem<a class="headerlink" href="#theorem" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Theorem (Error of FUTON with a linear decoder).</strong> Let <span class="arithmatex">\(\boldsymbol{s}\)</span> be square-integrable, <span class="arithmatex">\(K = (K_1, \dots, K_C)\)</span> and <span class="arithmatex">\(R \ge 1\)</span>.</p>
+<p><strong>(1) Every FUTON.</strong> For every <span class="arithmatex">\(\boldsymbol{\theta}\)</span>,</p>
+<div class="arithmatex">\[
+\big\lVert \boldsymbol{s} - \boldsymbol{s}^{\text{futon}}_{\boldsymbol{\theta}} \big\rVert^2 = \underbrace{\lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2}_{\text{truncation}} + \underbrace{\big\lVert \boldsymbol{\mathcal{Z}} - [\![ \boldsymbol{B}_1 \boldsymbol{U}^{(1)}, \dots, \boldsymbol{B}_C \boldsymbol{U}^{(C)}, \boldsymbol{V} ]\!] \big\rVert_F^2}_{\text{CP misfit}},
+\]</div>
+<p>and the truncation is <span class="arithmatex">\(\lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 = \lVert \boldsymbol{s} \rVert^2 - \lVert \boldsymbol{\mathcal{Z}} \rVert_F^2\)</span>.</p>
+<p><strong>(2) The best FUTON.</strong></p>
+<div class="arithmatex">\[
+\inf_{\boldsymbol{\theta}} \big\lVert \boldsymbol{s} - \boldsymbol{s}^{\text{futon}}_{\boldsymbol{\theta}} \big\rVert^2 = \lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 + \varepsilon_R(\boldsymbol{\mathcal{Z}})^2 .
+\]</div>
+<p><strong>(3) Computable bounds.</strong> <span class="arithmatex">\(L_R \le \varepsilon_R(\boldsymbol{\mathcal{Z}}) \le U_R\)</span>, where</p>
+<div class="arithmatex">\[
+L_R^2 = \max_{\mathbb{S}} \sum_{i &gt; R} \sigma_i^2\big(\boldsymbol{\mathcal{Z}}_{\langle \mathbb{S} \rangle}\big), \qquad U_R^2 = \lVert \boldsymbol{\mathcal{Z}} \rVert_F^2 - \sum_{\ell = 1}^{R} w_{(\ell)}^2 ,
+\]</div>
+<p>and <span class="arithmatex">\(w_{(1)} \ge w_{(2)} \ge \cdots\)</span> are the sorted weights of an orthonormal rank-1 expansion <span class="arithmatex">\(\boldsymbol{\mathcal{Z}} = \sum_\ell w_\ell \boldsymbol{\mathcal{T}}_\ell\)</span> by nested SVDs (Lemma 3). The upper bound comes with its model: if <span class="arithmatex">\([\![ \tilde{\boldsymbol{U}}^{(1)}, \dots, \tilde{\boldsymbol{U}}^{(C)}, \tilde{\boldsymbol{V}} ]\!]\)</span> is the sum of the <span class="arithmatex">\(R\)</span> heaviest terms, the FUTON with <span class="arithmatex">\(\hat{\boldsymbol{U}}^{(c)} = \boldsymbol{B}_c^{+} \tilde{\boldsymbol{U}}^{(c)}\)</span> and <span class="arithmatex">\(\hat{\boldsymbol{V}} = \tilde{\boldsymbol{V}}\)</span> has squared error exactly <span class="arithmatex">\(\lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 + U_R^2\)</span>. Any other tensor of rank at most <span class="arithmatex">\(R\)</span> in place of those terms gives a FUTON in the same way, and its misfit is an upper bound too.</p>
+<p><strong>(4) When the bounds meet.</strong> If at most two modes of <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span> have more than one entry, as for <span class="arithmatex">\(C = 1\)</span>, or for <span class="arithmatex">\(C = 2\)</span> and <span class="arithmatex">\(D = 1\)</span>, then <span class="arithmatex">\(L_R = \varepsilon_R(\boldsymbol{\mathcal{Z}}) = U_R\)</span> and the infimum in (2) is attained. With three or more such modes, as for <span class="arithmatex">\(C \ge 3\)</span>, or for <span class="arithmatex">\(C = 2\)</span> and <span class="arithmatex">\(D \ge 2\)</span>, it need not be attained.</p>
+<p>All these quantities depend on the basis only through the span of <span class="arithmatex">\(\boldsymbol{\varphi}\)</span> on each axis.</p>
+</blockquote>
+<p>For an orthonormal basis, <span class="arithmatex">\(\boldsymbol{B}_c = \boldsymbol{I}\)</span> and <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span> holds the generalized Fourier coefficients, so item (2) reads: the best FUTON misses the signal by the truncation of its generalized Fourier series plus the best rank-<span class="arithmatex">\(R\)</span> CP approximation error of its coefficients. The theorem extends this to any basis, states it for every <span class="arithmatex">\(\boldsymbol{\theta}\)</span>, and brackets the CP part where its exact value is out of reach.</p>
+<p><strong>Truncation, ceiling and certified FUTON.</strong> A signal in <span class="arithmatex">\([-1, 1]\)</span> fitted on its grid with squared error <span class="arithmatex">\(e\)</span> has <span class="arithmatex">\(\mathrm{PSNR} = 10 \log_{10}(4D / e)\)</span>, and the theorem gives three PSNRs at each <span class="arithmatex">\((K, R)\)</span>:</p>
+<ul>
+<li>the <em>truncation</em>, with <span class="arithmatex">\(e = \lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2\)</span>, which no FUTON of resolution <span class="arithmatex">\(K\)</span> exceeds, at any rank;</li>
+<li>the <em>ceiling</em>, with <span class="arithmatex">\(e = \lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 + L_R^2\)</span>, which no FUTON of resolution <span class="arithmatex">\(K\)</span> and rank <span class="arithmatex">\(R\)</span> exceeds. It is a value, not a model, and a FUTON reaches it only in the case of item (4);</li>
+<li>the <em>certified PSNR</em>, with <span class="arithmatex">\(e = \lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 + U_R^2\)</span>, the exact PSNR of the <em>certified FUTON</em> <span class="arithmatex">\(\hat{\boldsymbol{\theta}}\)</span> of item (3), built from the samples without training. It comes in two forms, named for how they are computed: the <em>SVD form</em> takes the <span class="arithmatex">\(R\)</span> heaviest terms of the nested-SVD expansion (<code>sweeps=0</code>), and the <em>ALS form</em>, the default, refines them by alternating least squares (Algorithm), which never lowers the PSNR.</li>
+</ul>
+<p>The best PSNR a FUTON of resolution <span class="arithmatex">\(K\)</span> and rank <span class="arithmatex">\(R\)</span> can reach lies between the certified PSNR and the ceiling.</p>
+<blockquote>
+<p><strong>Corollary (design).</strong> A target PSNR <span class="arithmatex">\(\tau\)</span> is out of reach at <span class="arithmatex">\((K, R)\)</span> if the ceiling is below <span class="arithmatex">\(\tau\)</span>, and the certified FUTON reaches it if the certified PSNR is at least <span class="arithmatex">\(\tau\)</span>. The smallest <span class="arithmatex">\((K, R)\)</span> of the second kind is therefore a design for <span class="arithmatex">\(\tau\)</span> that comes with its model, and no <span class="arithmatex">\((K, R)\)</span> of the first kind can be one.</p>
+</blockquote>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Proposition (separation rank).</strong> If <span class="arithmatex">\(\boldsymbol{s}\)</span> is within <span class="arithmatex">\(\delta\)</span> of a sum of <span class="arithmatex">\(R\)</span> separable terms, <span class="arithmatex">\(\lVert \boldsymbol{s} - \sum_{r=1}^{R} g^{(1)}_r(x_1) \cdots g^{(C)}_r(x_C) \, \boldsymbol{v}_r \rVert \le \delta\)</span> with any <span class="arithmatex">\(g^{(c)}_r \in L^2(\mathbb{X}_c, \mu_c)\)</span> and <span class="arithmatex">\(\boldsymbol{v}_r \in \mathbb{R}^D\)</span>, then the best FUTON of rank <span class="arithmatex">\(R\)</span> at resolution <span class="arithmatex">\(K\)</span> has squared error at most <span class="arithmatex">\(\lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 + \delta^2\)</span>, whatever the basis.</p>
+</blockquote>
+<p>Fixing the basis thus costs nothing but the truncation: FUTON never needs more rank than the signal's separation rank at the same accuracy.</p>
+<p><strong>Remark (why the bound depends on the signal).</strong> No bound on the rank a signal needs can hold for all signals. The tensors of rank at most <span class="arithmatex">\(R\)</span> in <span class="arithmatex">\(\mathbb{R}^{K'_1 \times \cdots \times K'_C \times D}\)</span> lie in a closed algebraic set of dimension at most <span class="arithmatex">\(R \, (\sum_c K'_c + D - C)\)</span> (Landsberg, 2012), so wherever that is below <span class="arithmatex">\(D \prod_c K'_c\)</span>, almost every coefficient tensor has a positive rank-<span class="arithmatex">\(R\)</span> error; almost every <span class="arithmatex">\(K \times K \times K\)</span> tensor has rank at least <span class="arithmatex">\(\lceil K^3 / (3K - 2) \rceil\)</span> (Lickteig, 1985), 21,903 at <span class="arithmatex">\(K = 256\)</span>. The theorem therefore works with the signal at hand, and the proposition pays with an assumption on it.</p>
+<p><strong>Remark (nonlinear decoders).</strong> The benchmarks' FUTON adds a one-hidden-layer ReLU decoder and a <span class="arithmatex">\(\tanh\)</span> at the output, which the theorem does not cover. The upper bound transfers to the decoder: a ReLU layer of at least <span class="arithmatex">\(2D\)</span> units contains every linear decoder, since <span class="arithmatex">\(\operatorname{relu}(x) - \operatorname{relu}(-x) = x\)</span>, so the best MLP-decoder FUTON at <span class="arithmatex">\((K, R)\)</span> is at least as good as the certified linear one, with more parameters. The lower bound does not transfer: biases and a hidden layer fit what no linear decoder can. The <span class="arithmatex">\(\tanh\)</span> is 1-Lipschitz, so for a target <span class="arithmatex">\(\boldsymbol{s} = \tanh(\tilde{\boldsymbol{s}})\)</span>, which on a grid is every target with <span class="arithmatex">\(\lvert \boldsymbol{s} \rvert &lt; 1\)</span>, the error of <span class="arithmatex">\(\tanh \circ \boldsymbol{s}^{\text{futon}}\)</span> against <span class="arithmatex">\(\boldsymbol{s}\)</span> is at most that of <span class="arithmatex">\(\boldsymbol{s}^{\text{futon}}\)</span> against <span class="arithmatex">\(\tilde{\boldsymbol{s}}\)</span>, which the theorem bounds; a target that reaches <span class="arithmatex">\(\pm 1\)</span>, as occupancy does, has no such <span class="arithmatex">\(\tilde{\boldsymbol{s}}\)</span>.</p>
+<h2 id="proof">Proof<a class="headerlink" href="#proof" title="Permanent link">&para;</a></h2>
+<p><strong>Lemma 1 (Orthonormal basis of the span).</strong> The entries of <span class="arithmatex">\(\boldsymbol{\psi}(x_c)\)</span> are orthonormal in <span class="arithmatex">\(L^2(\mathbb{X}_c, \mu_c)\)</span>, and <span class="arithmatex">\(\boldsymbol{\varphi}(x_c) = \boldsymbol{B}_c^\top \boldsymbol{\psi}(x_c)\)</span> for <span class="arithmatex">\(\mu_c\)</span>-almost every <span class="arithmatex">\(x_c\)</span>. Hence they span the same space as <span class="arithmatex">\(\boldsymbol{\varphi}\)</span>.</p>
+<p><em>Proof.</em> <span class="arithmatex">\(\int \boldsymbol{\psi} \boldsymbol{\psi}^\top d\mu_c = (\boldsymbol{B}_c^{+})^\top \boldsymbol{B}_c^\top \boldsymbol{B}_c \boldsymbol{B}_c^{+} = (\boldsymbol{B}_c \boldsymbol{B}_c^{+})^\top (\boldsymbol{B}_c \boldsymbol{B}_c^{+}) = \boldsymbol{I}\)</span>. Let <span class="arithmatex">\(\boldsymbol{P} = \boldsymbol{B}_c^{+} \boldsymbol{B}_c\)</span>, the orthogonal projector onto the row space of <span class="arithmatex">\(\boldsymbol{B}_c\)</span>; then <span class="arithmatex">\(\boldsymbol{B}_c^\top \boldsymbol{\psi} = \boldsymbol{P}^\top \boldsymbol{\varphi} = \boldsymbol{P} \boldsymbol{\varphi}\)</span>. Moreover <span class="arithmatex">\(\int \lVert (\boldsymbol{I} - \boldsymbol{P}) \boldsymbol{\varphi} \rVert_2^2 \, d\mu_c = \operatorname{tr}\big((\boldsymbol{I} - \boldsymbol{P}) \boldsymbol{G}_c (\boldsymbol{I} - \boldsymbol{P})\big) = \lVert \boldsymbol{B}_c (\boldsymbol{I} - \boldsymbol{P}) \rVert_F^2 = 0\)</span>, because <span class="arithmatex">\(\boldsymbol{B}_c \boldsymbol{P} = \boldsymbol{B}_c\)</span>. So <span class="arithmatex">\(\boldsymbol{\varphi} = \boldsymbol{P} \boldsymbol{\varphi} = \boldsymbol{B}_c^\top \boldsymbol{\psi}\)</span> almost everywhere, which puts the span of <span class="arithmatex">\(\boldsymbol{\varphi}\)</span> inside that of <span class="arithmatex">\(\boldsymbol{\psi}\)</span>; the definition of <span class="arithmatex">\(\boldsymbol{\psi}\)</span> gives the converse. <span class="arithmatex">\(\square\)</span></p>
+<p>By Fubini, <span class="arithmatex">\(\langle \prod_c \psi_{j_c}, \prod_c \psi_{j'_c} \rangle = \prod_c \langle \psi_{j_c}, \psi_{j'_c} \rangle = \delta_{\boldsymbol{j} \boldsymbol{j}'}\)</span>, the orthonormality half of the paper's Theorem 1, and by Lemma 1 these products span <span class="arithmatex">\(\mathbb{V}_K\)</span>; so they form an orthonormal basis of it. Write <span class="arithmatex">\(\boldsymbol{\Phi}(\boldsymbol{x}) = \boldsymbol{\varphi}(x_1) \otimes \cdots \otimes \boldsymbol{\varphi}(x_C)\)</span>, <span class="arithmatex">\(\boldsymbol{\Psi}(\boldsymbol{x}) = \boldsymbol{\psi}(x_1) \otimes \cdots \otimes \boldsymbol{\psi}(x_C)\)</span>, and <span class="arithmatex">\(\bullet\)</span> for the generalized dot product (Definition 1). Then <span class="arithmatex">\(\hat{\boldsymbol{s}}_K = \boldsymbol{\Psi} \bullet \boldsymbol{\mathcal{Z}}\)</span>, and Parseval's identity reads <span class="arithmatex">\(\lVert \boldsymbol{\Psi} \bullet \boldsymbol{\mathcal{A}} \rVert = \lVert \boldsymbol{\mathcal{A}} \rVert_F\)</span> for every tensor <span class="arithmatex">\(\boldsymbol{\mathcal{A}}\)</span> of the size of <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span>.</p>
+<p><strong>Lemma 2 (CP form under mode products).</strong> <span class="arithmatex">\([\![ \boldsymbol{U}^{(1)}, \dots, \boldsymbol{U}^{(C)}, \boldsymbol{V} ]\!] \times_1 \boldsymbol{B}_1 \cdots \times_C \boldsymbol{B}_C = [\![ \boldsymbol{B}_1 \boldsymbol{U}^{(1)}, \dots, \boldsymbol{B}_C \boldsymbol{U}^{(C)}, \boldsymbol{V} ]\!]\)</span>.</p>
+<p><em>Proof.</em> By the paper's Definition 15, <span class="arithmatex">\((\boldsymbol{u}_1 \otimes \cdots \otimes \boldsymbol{u}_C \otimes \boldsymbol{v}) \times_c \boldsymbol{B}_c\)</span> replaces <span class="arithmatex">\(\boldsymbol{u}_c\)</span> by <span class="arithmatex">\(\boldsymbol{B}_c \boldsymbol{u}_c\)</span>, and the mode product is linear. <span class="arithmatex">\(\square\)</span></p>
+<p><strong>Lemma 3 (Orthonormal rank-1 expansion).</strong> For a tensor <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span> of order <span class="arithmatex">\(M \ge 2\)</span> and any order of its modes, nested SVDs give <span class="arithmatex">\(\boldsymbol{\mathcal{Z}} = \sum_\ell w_\ell \boldsymbol{\mathcal{T}}_\ell\)</span> with <span class="arithmatex">\(w_\ell \ge 0\)</span>, every <span class="arithmatex">\(\boldsymbol{\mathcal{T}}_\ell\)</span> of rank one, and <span class="arithmatex">\(\langle \boldsymbol{\mathcal{T}}_\ell, \boldsymbol{\mathcal{T}}_{\ell'} \rangle = \delta_{\ell \ell'}\)</span>. For every set <span class="arithmatex">\(\mathbb{L}\)</span> of <span class="arithmatex">\(R\)</span> terms, <span class="arithmatex">\(\sum_{\ell \in \mathbb{L}} w_\ell \boldsymbol{\mathcal{T}}_\ell\)</span> has rank at most <span class="arithmatex">\(R\)</span> and <span class="arithmatex">\(\lVert \boldsymbol{\mathcal{Z}} - \sum_{\ell \in \mathbb{L}} w_\ell \boldsymbol{\mathcal{T}}_\ell \rVert_F^2 = \lVert \boldsymbol{\mathcal{Z}} \rVert_F^2 - \sum_{\ell \in \mathbb{L}} w_\ell^2\)</span>.</p>
+<p><em>Proof.</em> By induction on <span class="arithmatex">\(M\)</span>. For <span class="arithmatex">\(M = 2\)</span> the SVD is such an expansion. For <span class="arithmatex">\(M &gt; 2\)</span>, let the first mode in the order be <span class="arithmatex">\(m\)</span> and <span class="arithmatex">\(\boldsymbol{Z}_{(m)} = \sum_i \sigma_i \boldsymbol{a}_i \boldsymbol{b}_i^\top\)</span> be an SVD. Folding <span class="arithmatex">\(\boldsymbol{b}_i\)</span> into a tensor <span class="arithmatex">\(\boldsymbol{\mathcal{Y}}_i\)</span> of the other <span class="arithmatex">\(M - 1\)</span> modes gives <span class="arithmatex">\(\boldsymbol{\mathcal{Z}} = \sum_i \sigma_i \, \boldsymbol{a}_i \otimes \boldsymbol{\mathcal{Y}}_i\)</span> with <span class="arithmatex">\(\langle \boldsymbol{\mathcal{Y}}_i, \boldsymbol{\mathcal{Y}}_j \rangle = \delta_{ij}\)</span>, the modes put back in place. By induction <span class="arithmatex">\(\boldsymbol{\mathcal{Y}}_i = \sum_{\ell'} w'_{i \ell'} \boldsymbol{\mathcal{T}}'_{i \ell'}\)</span>, so <span class="arithmatex">\(\boldsymbol{\mathcal{Z}} = \sum_{i, \ell'} \sigma_i w'_{i\ell'} \, \boldsymbol{a}_i \otimes \boldsymbol{\mathcal{T}}'_{i \ell'}\)</span>, a sum of rank-1 tensors with <span class="arithmatex">\(\langle \boldsymbol{a}_i \otimes \boldsymbol{\mathcal{T}}'_{i \ell'}, \boldsymbol{a}_j \otimes \boldsymbol{\mathcal{T}}'_{j k'} \rangle = \langle \boldsymbol{a}_i, \boldsymbol{a}_j \rangle \langle \boldsymbol{\mathcal{T}}'_{i \ell'}, \boldsymbol{\mathcal{T}}'_{j k'} \rangle = \delta_{ij} \delta_{\ell' k'}\)</span>. The residual is the sum of the terms outside <span class="arithmatex">\(\mathbb{L}\)</span>, whose squared norm is the sum of their squared weights by orthonormality. <span class="arithmatex">\(\square\)</span></p>
+<p><strong>Proof of the theorem.</strong> (1) Substituting the CP form (8) into Eq. (7), as the paper does to derive Eqs. (9) to (11), gives <span class="arithmatex">\(\boldsymbol{s}^{\text{futon}}_{\boldsymbol{\theta}} = \boldsymbol{\Phi} \bullet \boldsymbol{\mathcal{W}}\)</span> with <span class="arithmatex">\(\boldsymbol{\mathcal{W}} = [\![ \boldsymbol{U}^{(1)}, \dots, \boldsymbol{U}^{(C)}, \boldsymbol{V} ]\!]\)</span>. By Lemma 1, <span class="arithmatex">\(\boldsymbol{\Phi}(\boldsymbol{x}) = \bigotimes_c \boldsymbol{B}_c^\top \boldsymbol{\psi}(x_c)\)</span> almost everywhere, so <span class="arithmatex">\(\boldsymbol{\Phi} \bullet \boldsymbol{\mathcal{W}} = \boldsymbol{\Psi} \bullet \boldsymbol{\mathcal{Y}}_{\boldsymbol{\theta}}\)</span> with <span class="arithmatex">\(\boldsymbol{\mathcal{Y}}_{\boldsymbol{\theta}} = \boldsymbol{\mathcal{W}} \times_1 \boldsymbol{B}_1 \cdots \times_C \boldsymbol{B}_C = [\![ \boldsymbol{B}_1 \boldsymbol{U}^{(1)}, \dots, \boldsymbol{B}_C \boldsymbol{U}^{(C)}, \boldsymbol{V} ]\!]\)</span> by Lemma 2. Then</p>
+<div class="arithmatex">\[
+\boldsymbol{s} - \boldsymbol{s}^{\text{futon}}_{\boldsymbol{\theta}} = (\boldsymbol{s} - \hat{\boldsymbol{s}}_K) + \boldsymbol{\Psi} \bullet (\boldsymbol{\mathcal{Z}} - \boldsymbol{\mathcal{Y}}_{\boldsymbol{\theta}}),
+\]</div>
+<p>where the first term is orthogonal to <span class="arithmatex">\(\mathbb{V}_K\)</span> and the second lies in it. Pythagoras and Parseval give (1). The same argument with <span class="arithmatex">\(\boldsymbol{\mathcal{Y}} = \boldsymbol{0}\)</span> gives <span class="arithmatex">\(\lVert \boldsymbol{s} \rVert^2 = \lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 + \lVert \boldsymbol{\mathcal{Z}} \rVert_F^2\)</span>.</p>
+<p>(2) The image of <span class="arithmatex">\(\boldsymbol{\theta} \mapsto \boldsymbol{\mathcal{Y}}_{\boldsymbol{\theta}}\)</span> is exactly the set of tensors of rank at most <span class="arithmatex">\(R\)</span>. It lies inside, since Lemma 2 writes <span class="arithmatex">\(\boldsymbol{\mathcal{Y}}_{\boldsymbol{\theta}}\)</span> as a sum of <span class="arithmatex">\(R\)</span> rank-1 terms. It covers the set, since for <span class="arithmatex">\(\boldsymbol{\mathcal{Y}} = [\![ \tilde{\boldsymbol{U}}^{(1)}, \dots, \tilde{\boldsymbol{U}}^{(C)}, \tilde{\boldsymbol{V}} ]\!]\)</span> the parameters <span class="arithmatex">\(\hat{\boldsymbol{\theta}} = (\boldsymbol{B}_1^{+} \tilde{\boldsymbol{U}}^{(1)}, \dots, \boldsymbol{B}_C^{+} \tilde{\boldsymbol{U}}^{(C)}, \tilde{\boldsymbol{V}})\)</span> give <span class="arithmatex">\(\boldsymbol{\mathcal{Y}}_{\hat{\boldsymbol{\theta}}} = \boldsymbol{\mathcal{Y}}\)</span>, because <span class="arithmatex">\(\boldsymbol{B}_c \boldsymbol{B}_c^{+} = \boldsymbol{I}\)</span>. Taking the infimum of (1) over <span class="arithmatex">\(\boldsymbol{\theta}\)</span> is therefore taking it over that set.</p>
+<p>(3) <em>Lower bound.</em> Each rank-1 term of a tensor <span class="arithmatex">\(\boldsymbol{\mathcal{Y}}\)</span> of rank at most <span class="arithmatex">\(R\)</span> flattens to a rank-1 matrix, so <span class="arithmatex">\(\operatorname{rank} \boldsymbol{\mathcal{Y}}_{\langle \mathbb{S} \rangle} \le R\)</span>, as the paper's Eq. (27) shows for one mode. Flattening preserves the Frobenius norm, and by the Eckart–Young–Mirsky theorem <span class="arithmatex">\(\lVert \boldsymbol{\mathcal{Z}} - \boldsymbol{\mathcal{Y}} \rVert_F^2 = \lVert \boldsymbol{\mathcal{Z}}_{\langle \mathbb{S} \rangle} - \boldsymbol{\mathcal{Y}}_{\langle \mathbb{S} \rangle} \rVert_F^2 \ge \sum_{i &gt; R} \sigma_i^2(\boldsymbol{\mathcal{Z}}_{\langle \mathbb{S} \rangle})\)</span> for every <span class="arithmatex">\(\mathbb{S}\)</span>. <em>Upper bound.</em> By Lemma 3 the <span class="arithmatex">\(R\)</span> heaviest terms form a tensor of rank at most <span class="arithmatex">\(R\)</span> at squared distance <span class="arithmatex">\(U_R^2\)</span>, which is <span class="arithmatex">\(\boldsymbol{\mathcal{Y}}_{\hat{\boldsymbol{\theta}}}\)</span> for the <span class="arithmatex">\(\hat{\boldsymbol{\theta}}\)</span> of (2); by (1) that FUTON's squared error is <span class="arithmatex">\(\lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 + U_R^2\)</span>. Any other tensor of rank at most <span class="arithmatex">\(R\)</span> works in the same way.</p>
+<p>(4) If two modes have more than one entry, the tensors of rank at most <span class="arithmatex">\(R\)</span> are the matrices of rank at most <span class="arithmatex">\(R\)</span> in those modes, and the expansion of Lemma 3 along them is the SVD. Its <span class="arithmatex">\(R\)</span> heaviest terms are the truncated SVD, so <span class="arithmatex">\(U_R = L_R\)</span> is the Eckart–Young–Mirsky optimum, which is attained. With three or more such modes, the set of tensors of rank at most <span class="arithmatex">\(R\)</span> is not closed in general, and a best approximation need not exist (de Silva and Lim, <em>SIAM J. Matrix Anal. Appl.</em> 30(3), 2008).</p>
+<p>The quantities depend on the basis only through its span: another orthonormal basis of the same span is <span class="arithmatex">\(\boldsymbol{O} \boldsymbol{\psi}\)</span> with <span class="arithmatex">\(\boldsymbol{O}\)</span> orthogonal, which rotates <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span> mode by mode and changes no norm, no singular value and no weight of the nested SVDs. <span class="arithmatex">\(\blacksquare\)</span></p>
+<p><strong>Proof of the proposition.</strong> <span class="arithmatex">\(\mathbb{V}_K\)</span> is the span of products of one function per axis from the axis spans, so its projection factorizes over the axes, <span class="arithmatex">\(P_K = P_{K_1} \otimes \cdots \otimes P_{K_C}\)</span>, and <span class="arithmatex">\(P_K\)</span> of a separable term is the separable term of the projected factors. Hence <span class="arithmatex">\(P_K \sum_r g^{(1)}_r \cdots g^{(C)}_r \boldsymbol{v}_r = \boldsymbol{\Psi} \bullet \boldsymbol{\mathcal{Y}}\)</span> with <span class="arithmatex">\(\boldsymbol{\mathcal{Y}}\)</span> a sum of <span class="arithmatex">\(R\)</span> rank-1 tensors, and by item (1) the FUTON with that <span class="arithmatex">\(\boldsymbol{\mathcal{Y}}\)</span> has squared error <span class="arithmatex">\(\lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 + \lVert \boldsymbol{\mathcal{Z}} - \boldsymbol{\mathcal{Y}} \rVert_F^2\)</span>, where <span class="arithmatex">\(\lVert \boldsymbol{\mathcal{Z}} - \boldsymbol{\mathcal{Y}} \rVert_F = \lVert P_K (\boldsymbol{s} - \sum_r g^{(1)}_r \cdots g^{(C)}_r \boldsymbol{v}_r) \rVert \le \delta\)</span>, a projection being nonexpansive. <span class="arithmatex">\(\square\)</span></p>
+<p><strong>Remark (refinement).</strong> Item (3) holds for any tensor of rank at most <span class="arithmatex">\(R\)</span>, so the SVD form can be improved by any search whose result is taken exactly: the ALS form refines it by alternating least squares, whose every sweep solves each factor's least-squares problem exactly and so never increases <span class="arithmatex">\(\lVert \boldsymbol{\mathcal{Z}} - \boldsymbol{\mathcal{Y}} \rVert_F\)</span>. Every iterate is a valid, tighter <span class="arithmatex">\(U_R\)</span> and, by (2), again a FUTON. A smaller rank's factors, padded with zero components, are factors of every larger rank, so <span class="arithmatex">\(U_R\)</span> is also taken nonincreasing in <span class="arithmatex">\(R\)</span>.</p>
+<p><strong>Remark (colour channels).</strong> For RGB images, <span class="arithmatex">\(C = 2\)</span> and <span class="arithmatex">\(D = 3\)</span>, so <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span> is of order three and item (4) does not apply. The decoder <span class="arithmatex">\(\boldsymbol{V}\)</span> is the factor of the colour mode. Expanding that mode first in Lemma 3 is a principal component analysis of the colours, followed by one SVD per colour component and a common rank budget across them.</p>
+<h2 id="algorithm">Algorithm<a class="headerlink" href="#algorithm" title="Permanent link">&para;</a></h2>
+<p>On the sampling grid, axis <span class="arithmatex">\(c\)</span>'s basis is the matrix <span class="arithmatex">\(\boldsymbol{\Phi}_c \in \mathbb{R}^{N_c \times K_c}\)</span> with rows <span class="arithmatex">\(\boldsymbol{\varphi}(x_{c,n})^\top\)</span>, and the signal is the array <span class="arithmatex">\(\boldsymbol{\mathcal{S}} \in \mathbb{R}^{N_1 \times \cdots \times N_C \times D}\)</span> of its samples. A thin SVD <span class="arithmatex">\(\boldsymbol{\Phi}_c / \sqrt{N_c} = \boldsymbol{Q}_c \boldsymbol{\Sigma}_c \boldsymbol{P}_c^\top\)</span>, truncated at the numerical rank <span class="arithmatex">\(K'_c\)</span>, gives <span class="arithmatex">\(\boldsymbol{B}_c = \boldsymbol{\Sigma}_c \boldsymbol{P}_c^\top\)</span>, <span class="arithmatex">\(\boldsymbol{B}_c^{+} = \boldsymbol{P}_c \boldsymbol{\Sigma}_c^{-1}\)</span> and <span class="arithmatex">\(\boldsymbol{\psi}(x_{c,n}) = \sqrt{N_c} \, [\boldsymbol{Q}_c]_{n,:}\)</span>.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Computes</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><span class="arithmatex">\(\boldsymbol{Q}_c, \boldsymbol{\Sigma}_c, \boldsymbol{P}_c\)</span> from the thin SVD of <span class="arithmatex">\(\boldsymbol{\Phi}_c / \sqrt{N_c}\)</span></td>
+<td><span class="arithmatex">\(O(N_c K_c^2)\)</span> per axis</td>
+</tr>
+<tr>
+<td>2</td>
+<td><span class="arithmatex">\(\boldsymbol{\mathcal{Z}} = \boldsymbol{\mathcal{S}} \times_1 \boldsymbol{Q}_1^\top \cdots \times_C \boldsymbol{Q}_C^\top / \sqrt{N}\)</span></td>
+<td><span class="arithmatex">\(O(N D \sum_c K_c)\)</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td><span class="arithmatex">\(\lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 = \lVert \boldsymbol{\mathcal{S}} \rVert_F^2 / N - \lVert \boldsymbol{\mathcal{Z}} \rVert_F^2\)</span>, exact</td>
+<td><span class="arithmatex">\(O(N D)\)</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td><span class="arithmatex">\(L_R^2\)</span>: singular values of every flattening of <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span>, tails beyond each <span class="arithmatex">\(R\)</span></td>
+<td>one eigendecomposition per split</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Lemma 3 for every mode order, keeping the order with the most weight in its <span class="arithmatex">\(R\)</span> heaviest terms: the SVD form</td>
+<td>nested SVDs of <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}\)</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Refine those terms by alternating least squares (below): the ALS form; <span class="arithmatex">\(U_R^2 = \lVert \boldsymbol{\mathcal{Z}} - \boldsymbol{\mathcal{Y}} \rVert_F^2\)</span> in float64</td>
+<td><span class="arithmatex">\(O(T R D \prod_c K'_c)\)</span> for <span class="arithmatex">\(T\)</span> sweeps</td>
+</tr>
+<tr>
+<td>7</td>
+<td><span class="arithmatex">\(\hat{\boldsymbol{U}}^{(c)} = \boldsymbol{P}_c \boldsymbol{\Sigma}_c^{-1} \tilde{\boldsymbol{U}}^{(c)}\)</span>, <span class="arithmatex">\(\hat{\boldsymbol{V}} = \tilde{\boldsymbol{V}}\)</span></td>
+<td><span class="arithmatex">\(O(R \sum_c K_c K'_c)\)</span></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Alternating least squares.</strong> Step 6 starts from the SVD form and minimizes the CP misfit <span class="arithmatex">\(\lVert \boldsymbol{\mathcal{Z}} - [\![ \boldsymbol{A}_1, \dots, \boldsymbol{A}_{C+1} ]\!] \rVert_F^2\)</span> over the factors <span class="arithmatex">\(\boldsymbol{A}_m \in \mathbb{R}^{K'_m \times R}\)</span> of the coefficient tensor's <span class="arithmatex">\(C + 1\)</span> modes: <span class="arithmatex">\(\boldsymbol{A}_c = \tilde{\boldsymbol{U}}^{(c)}\)</span> for the axes and <span class="arithmatex">\(\boldsymbol{A}_{C+1} = \tilde{\boldsymbol{V}}\)</span>, with <span class="arithmatex">\(K'_{C+1} = D\)</span>, for the channels. A sweep visits the modes in turn and replaces each factor by the exact least-squares solution with the others held fixed,</p>
+<div class="arithmatex">\[
+\boldsymbol{A}_m \leftarrow \boldsymbol{\mathcal{Z}}_{(m)} \boldsymbol{K}_m \Big( \bigodot_{k \ne m} \boldsymbol{A}_k^\top \boldsymbol{A}_k \Big)^{-1},
+\]</div>
+<p>where <span class="arithmatex">\(\boldsymbol{\mathcal{Z}}_{(m)}\)</span> is the mode-<span class="arithmatex">\(m\)</span> matricization, <span class="arithmatex">\(\boldsymbol{K}_m\)</span> the Khatri–Rao product of the other factors in the matching order, and <span class="arithmatex">\(\odot\)</span> the elementwise product of their <span class="arithmatex">\(R \times R\)</span> Gram matrices; the system is solved with a ridge of <span class="arithmatex">\(10^{-12}\)</span> of its mean diagonal. Each update is an exact block minimization, so a sweep never raises the misfit. After a sweep, each component's scale is spread evenly over the modes, which leaves the tensor unchanged, and the sweep's step is continued past the new factors by <span class="arithmatex">\(k^{1/3}\)</span> times its length at sweep <span class="arithmatex">\(k\)</span>, kept if that lowers the misfit (Bro, 1998). The sweeps stop once one lowers the bound, truncation plus misfit, by less than <span class="arithmatex">\(\mathrm{tol} = 3 \cdot 10^{-5}\)</span> of it, or after 500. They work on the coefficient tensor, not on the samples, so a sweep costs <span class="arithmatex">\(O(R D \prod_c K'_c)\)</span> whatever the number of samples; they run in float32 on the signal's device, and <span class="arithmatex">\(U_R\)</span> is the misfit of the final factors in float64, valid whatever the search found. Each rank is refined on its own, and <code>sweeps=0</code> skips the step and returns the SVD form.</p>
+<p>Dividing by <span class="arithmatex">\(D\)</span> turns the outputs into mean squared errors: every FUTON has an error of at least <span class="arithmatex">\((\lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 + L_R^2)/D\)</span>, and the certified FUTON <span class="arithmatex">\(\hat{\boldsymbol{\theta}}\)</span> has exactly <span class="arithmatex">\((\lVert \boldsymbol{s} - \hat{\boldsymbol{s}}_K \rVert^2 + U_R^2)/D\)</span>. Everything a bound rests on, steps 1 to 5 and the misfit of step 6, is computed in float64. Step 2 is the only pass over the signal, and it is separable, one matrix product per axis. The rest works on the coefficient tensor, whose size is set by <span class="arithmatex">\(K\)</span>, not by the signal, which is what makes the bound cheap next to training: Adam's every step passes over a batch of the signal, through the whole model, for thousands of steps.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">neurofield</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nf</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">data</span> <span class="o">=</span> <span class="n">nf</span><span class="o">.</span><span class="n">ImageCoordinateDataset</span><span class="p">(</span><span class="s2">"data/Kodak/kodim19.png"</span><span class="p">)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">H</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">shape</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">model</span> <span class="o">=</span> <span class="n">nf</span><span class="o">.</span><span class="n">FUTON</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="p">(</span><span class="s2">"sinc"</span><span class="p">,</span> <span class="p">{</span><span class="s2">"num_components"</span><span class="p">:</span> <span class="p">[</span><span class="n">H</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">W</span> <span class="o">//</span> <span class="mi">2</span><span class="p">]}),</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                 <span class="p">(</span><span class="s2">"cp"</span><span class="p">,</span> <span class="p">{</span><span class="s2">"rank"</span><span class="p">:</span> <span class="mi">64</span><span class="p">}),</span> <span class="p">(</span><span class="s2">"linear"</span><span class="p">,</span> <span class="p">{</span><span class="s2">"bias"</span><span class="p">:</span> <span class="kc">False</span><span class="p">}))</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">features</span> <span class="o">=</span> <span class="p">[</span><span class="n">model</span><span class="o">.</span><span class="n">basis</span><span class="o">.</span><span class="n">axis_features</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">c</span><span class="p">)</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>            <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">((</span><span class="n">H</span><span class="p">,</span> <span class="n">W</span><span class="p">))]</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">bound</span> <span class="o">=</span> <span class="n">nf</span><span class="o">.</span><span class="n">futon_bound</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">ranks</span><span class="o">=</span><span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">256</span><span class="p">])</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">bound</span><span class="o">.</span><span class="n">truncation</span><span class="p">,</span> <span class="n">bound</span><span class="o">.</span><span class="n">lower</span><span class="p">,</span> <span class="n">bound</span><span class="o">.</span><span class="n">upper</span>   <span class="c1"># mean squared errors</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">bound</span><span class="o">.</span><span class="n">initialize</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>                      <span class="c1"># the certified FUTON, error bound.upper[1]</span>
+</code></pre></div>
+<h2 id="experiment">Experiment<a class="headerlink" href="#experiment" title="Permanent link">&para;</a></h2>
+<p>The experiment asks three things of the bound: that it holds, that it is tight enough to stand in for training, and that it costs little enough to be worth computing first. Every number below is a dataset's: a mean, a count or a quantile over its signals.</p>
+<p><strong>Setup.</strong> The 24 Kodak images (<span class="arithmatex">\(C = 2\)</span>, <span class="arithmatex">\(D = 3\)</span>, <span class="arithmatex">\(768 \times 512\)</span> or <span class="arithmatex">\(512 \times 768\)</span> pixels in <span class="arithmatex">\([-1, 1]\)</span>) and the five Stanford occupancy volumes of the benchmark (<span class="arithmatex">\(C = 3\)</span>, <span class="arithmatex">\(D = 1\)</span>, occupancy <span class="arithmatex">\(\pm 1\)</span> on grids of 78 to 231 voxels per side), in the benchmark's sinc basis at <span class="arithmatex">\(K_c = \alpha N_c\)</span> for <span class="arithmatex">\(\alpha \in \{1/8, 1/4, 1/2\}\)</span>, with <span class="arithmatex">\(R \in \{32, 64, 128, 256\}\)</span>: 348 settings, and for the cost alone also at <span class="arithmatex">\(K = N\)</span>. For each, <code>nf.futon_bound</code> gives the truncation, the ceiling and the certified FUTON <span class="arithmatex">\(\hat{\boldsymbol{\theta}}\)</span> in its ALS form, and times its SVD form; the same FUTON is trained with Adam under the benchmark's protocol: 2000 epochs on 10 % of the points per step for images and 1 % for volumes, learning rate <span class="arithmatex">\(3 \cdot 10^{-2}\)</span> annealed to a hundredth, one seed. Errors are mean squared errors on the whole grid, and PSNR is <span class="arithmatex">\(10 \log_{10}(4 / \mathrm{MSE})\)</span> for signals in <span class="arithmatex">\([-1, 1]\)</span>. Everything ran on one NVIDIA A100, the bound and Adam in the same job, so they are timed alike; <code>python scripts/futon_bound.py</code> reproduces it, and <code>python scripts/report_paper.py --tasks bound</code> writes the figures and tables to <code>results/bound/</code>.</p>
+<p><strong>The bounds hold.</strong> No trained FUTON passes its ceiling, in any of the 348 settings: none has an error below the lower bound. Every certified FUTON, evaluated by its own forward pass in float32, has the error of its upper bound to within a relative <span class="arithmatex">\(3 \cdot 10^{-7}\)</span>. The tests check the same identities in float64 to <span class="arithmatex">\(10^{-9}\)</span>, as well as the Eckart–Young case, the invariance within a span and a DCT cross-check.</p>
+<p><strong>Images: the best FUTON is pinned down.</strong> For an image's coefficient tensor, of order three, the interval that holds the best PSNR has a median width of 0.09 dB over the images and settings, and 90 % of the intervals are narrower than 0.34 dB. It widens with <span class="arithmatex">\(K\)</span>, to a median of 0.01, 0.08 and 0.19 dB at <span class="arithmatex">\(N/8\)</span>, <span class="arithmatex">\(N/4\)</span> and <span class="arithmatex">\(N/2\)</span>, and closes as <span class="arithmatex">\(R\)</span> reaches the truncation. Adam's FUTON lies at or below the certified one in 98 % of the image settings, by 0.07 dB on average and up to 0.44 dB; where it is ahead, it is by at most 0.01 dB.</p>
+<p><strong>Volumes: the upper bound is the certificate.</strong> With three axes, every flattening of the coefficient tensor has rank at most the largest <span class="arithmatex">\(K_c\)</span>, so once <span class="arithmatex">\(R\)</span> passes it the lower bound falls back to the truncation, although the CP misfit itself need not vanish: the interval has a median width of 0.86 dB at <span class="arithmatex">\(N/4\)</span> and 3.11 dB at <span class="arithmatex">\(N/2\)</span>, while at <span class="arithmatex">\(N/8\)</span> the truncation alone caps the volumes at 17.9 dB on average, which the certified FUTON reaches to within 0.01 dB from <span class="arithmatex">\(R = 128\)</span> on. The certified FUTON beats Adam's in every setting, by 0.27 dB on average and up to 0.70 dB.</p>
+<figure>
+  <img alt="PSNR above Adam" src="../../assets/bound_gap.svg" width="620" />
+<br />
+<figcaption>PSNR above Adam's at K = N/2, averaged over the 24 Kodak images (left) and the five occupancy volumes (right), per rank, with one standard error of the difference: the ceiling; the certified FUTON in its ALS form (filled) and its SVD form (open); and, shaded between the ALS form and the ceiling, the region where the best FUTON lies.</figcaption>
+</figure>
+<p><strong>Where Adam's error goes.</strong> The theorem splits every FUTON's error into the truncation and the CP misfit, and the bounds split the misfit further: up to the ceiling it is forced by <span class="arithmatex">\(R\)</span>, from the ceiling to the certified FUTON it is open, and beyond the certified FUTON it is left by training. As shares of Adam's error at <span class="arithmatex">\(K = N/2\)</span>, the truncation is 31 % at <span class="arithmatex">\(R = 32\)</span> and 94 % at <span class="arithmatex">\(R = 256\)</span> on Kodak, the part that <span class="arithmatex">\(R\)</span> forces falls from 60 % to 1 %, at most 6 % stays open, and training leaves 2 to 4 %. On the volumes the truncation is 26 % to 62 %, the open part reaches 50 %, since the lower bound falls to the truncation there, and training leaves 8 to 13 %.</p>
+<figure>
+  <img alt="Where Adam's error goes" src="../../assets/bound_decomposition.svg" width="620" />
+<br />
+<figcaption>Adam's error at K = N/2, in percent, as the theorem splits it, averaged over the 24 Kodak images (left) and the five occupancy volumes (right), per rank: the truncation, which K forces; the part of the CP misfit up to the ceiling, which R forces; the part from the ceiling to the certified FUTON, which the bound leaves open; and the rest, which training leaves.</figcaption>
+</figure>
+<p><strong>Is training the limit?</strong> On every signal at <span class="arithmatex">\(K = N/2\)</span>, at <span class="arithmatex">\(R = 64\)</span> on Kodak and <span class="arithmatex">\(R = 128\)</span> on the volumes, Adam for five times the epochs and alternating least squares on the whole grid (<code>nf.LeastSquares</code> without momentum, from a random start), against the certified FUTON in its ALS form and the ceiling; means over each dataset, ± one within-signal standard error:</p>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th style="text-align: right;">R</th>
+<th style="text-align: right;">Certified (ALS)</th>
+<th style="text-align: right;">Ceiling</th>
+<th style="text-align: right;">Adam, 2000 epochs</th>
+<th style="text-align: right;">Adam, 10,000 epochs</th>
+<th style="text-align: right;">ALS, random start, 500 sweeps</th>
+<th style="text-align: right;">ALS, random start, 2000 sweeps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kodak</td>
+<td style="text-align: right;">64</td>
+<td style="text-align: right;">26.96 ± 0.00</td>
+<td style="text-align: right;">27.26 ± 0.04</td>
+<td style="text-align: right;">26.81 ± 0.02</td>
+<td style="text-align: right;">26.92 ± 0.01</td>
+<td style="text-align: right;">26.94 ± 0.01</td>
+<td style="text-align: right;">26.96 ± 0.01</td>
+</tr>
+<tr>
+<td>Occupancy</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">21.49 ± 0.06</td>
+<td style="text-align: right;">24.25 ± 0.26</td>
+<td style="text-align: right;">20.96 ± 0.06</td>
+<td style="text-align: right;">21.39 ± 0.05</td>
+<td style="text-align: right;">21.45 ± 0.05</td>
+<td style="text-align: right;">21.57 ± 0.06</td>
+</tr>
+</tbody>
+</table>
+<p>Five times the epochs raise Adam's mean from 26.81 to 26.92 dB on Kodak and from 20.96 to 21.39 dB on the volumes, against certified means of 26.96 and 21.49 dB. Least squares on the whole grid, from a random start, reaches 26.94 and 26.96 dB on Kodak and 21.45 and 21.57 dB on the volumes after 500 and 2000 sweeps. The better of the two passes the certified FUTON on 10 of the 24 images, by at most 0.06 dB, and on all five volumes, by at most 0.14 dB, inside the interval, as item (3) allows. None comes near the ceiling on the volumes, 2.7 dB above the best of them, where the lower bound is loose.</p>
+<p><strong>Design: <span class="arithmatex">\(K\)</span> and <span class="arithmatex">\(R\)</span> for a target PSNR.</strong> The corollary turns the bound into a design rule: among the candidate settings, take the smallest, by parameter count, whose certified PSNR reaches the target. The table compares that pick, per signal, with an oracle that trains every setting and takes the smallest that Adam reaches, and counts over each dataset. <em>Reached</em> counts the signals for which some setting reaches the target, by Adam, by the bound and by the ceiling; the next columns say how often the bound's pick has the same, a smaller or a larger parameter count than the oracle's, over the signals both reach, and the last the median parameter count of each pick.</p>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th style="text-align: right;">Target (dB)</th>
+<th style="text-align: right;">Reached by Adam, the bound, the ceiling</th>
+<th style="text-align: right;">Same pick</th>
+<th style="text-align: right;">Smaller</th>
+<th style="text-align: right;">Larger</th>
+<th style="text-align: right;">#Params, bound (k)</th>
+<th style="text-align: right;">#Params, Adam (k)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kodak</td>
+<td style="text-align: right;">22</td>
+<td style="text-align: right;">24/24, 24/24, 24/24</td>
+<td style="text-align: right;">96%</td>
+<td style="text-align: right;">4%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">5.2</td>
+<td style="text-align: right;">5.2</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">23/24, 23/24, 23/24</td>
+<td style="text-align: right;">96%</td>
+<td style="text-align: right;">4%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">5.2</td>
+<td style="text-align: right;">5.2</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">26</td>
+<td style="text-align: right;">22/24, 22/24, 22/24</td>
+<td style="text-align: right;">100%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">20.7</td>
+<td style="text-align: right;">20.7</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">28</td>
+<td style="text-align: right;">17/24, 18/24, 18/24</td>
+<td style="text-align: right;">88%</td>
+<td style="text-align: right;">12%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">41.2</td>
+<td style="text-align: right;">41.2</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">13/24, 13/24, 13/24</td>
+<td style="text-align: right;">85%</td>
+<td style="text-align: right;">15%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">82.3</td>
+<td style="text-align: right;">82.3</td>
+</tr>
+<tr>
+<td>Occupancy</td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">5/5, 5/5, 5/5</td>
+<td style="text-align: right;">100%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">7.0</td>
+<td style="text-align: right;">7.0</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">5/5, 5/5, 5/5</td>
+<td style="text-align: right;">80%</td>
+<td style="text-align: right;">20%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">7.7</td>
+<td style="text-align: right;">14.1</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">21</td>
+<td style="text-align: right;">4/5, 4/5, 5/5</td>
+<td style="text-align: right;">100%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">22.0</td>
+<td style="text-align: right;">22.0</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">22</td>
+<td style="text-align: right;">3/5, 3/5, 4/5</td>
+<td style="text-align: right;">67%</td>
+<td style="text-align: right;">33%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">31.2</td>
+<td style="text-align: right;">56.8</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">2/5, 3/5, 4/5</td>
+<td style="text-align: right;">100%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">0%</td>
+<td style="text-align: right;">56.8</td>
+<td style="text-align: right;">50.4</td>
+</tr>
+</tbody>
+</table>
+<p>The bound's pick is never larger than the oracle's, and it is smaller for some signals (4, 4, 12 and 15 % of the images at 22, 24, 28 and 30 dB; 20 and 33 % of the volumes at 20 and 22 dB), and it comes with its model; it certifies 28 dB on 18 of the 24 images, where Adam reaches it on 17, and 23 dB on 3 of the 5 volumes, where Adam reaches it on 2. Read along a budget instead, the certified mean ranks the spectral resolutions as Adam's results do at every parameter count: on Kodak, <span class="arithmatex">\(N/8\)</span> is best up to about 5k parameters, <span class="arithmatex">\(N/4\)</span> from about 10k to 21k, and <span class="arithmatex">\(N/2\)</span> from about 41k; on the volumes, <span class="arithmatex">\(N/8\)</span> is best up to about 2k parameters, <span class="arithmatex">\(N/4\)</span> from about 4k to 16k, and <span class="arithmatex">\(N/2\)</span> from about 31k. Either way, the <span class="arithmatex">\((K, R)\)</span> split is settled before anything is trained.</p>
+<p><strong>Cost.</strong> On the A100, the bound for all four ranks of a <span class="arithmatex">\(K\)</span> takes 0.6 to 5 s per image and 1 to 24 s per volume on average, up to 96 s on one volume at <span class="arithmatex">\(N/2\)</span>, where one Adam run takes 4 to 11 s and 5 to 9 s. Over every setting of a signal, the design above costs 5 s per image against 64 s of training, and 28 s per volume against 73 s: 3 to 12 times less, with the model that reaches the target included.</p>
+<p><strong>The SVD form.</strong> The refinement is what costs. The certified FUTON in its SVD form, <code>sweeps=0</code>, takes 0.03 to 5 s per image and 0.08 to 6 s per volume for all four ranks, 34 % and 25 % of one Adam run per rank, and certifies a median 0.33 dB below the ALS form on images (at most 4.03 dB) and 1.54 dB below on volumes (at most 2.56 dB). It is a valid certificate at once; the ALS form is the tighter one.</p>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th style="text-align: right;"><span class="arithmatex">\(K\)</span></th>
+<th style="text-align: right;">SVD (s)</th>
+<th style="text-align: right;">ALS (s)</th>
+<th style="text-align: right;">Adam (s)</th>
+<th style="text-align: right;">SVD, dB below ALS: median</th>
+<th style="text-align: right;">max</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kodak</td>
+<td style="text-align: right;">N/8</td>
+<td style="text-align: right;">0.03</td>
+<td style="text-align: right;">0.6</td>
+<td style="text-align: right;">17</td>
+<td style="text-align: right;">0.03</td>
+<td style="text-align: right;">1.02</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">N/4</td>
+<td style="text-align: right;">5.48</td>
+<td style="text-align: right;">2.6</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">0.16</td>
+<td style="text-align: right;">1.27</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">N/2</td>
+<td style="text-align: right;">0.26</td>
+<td style="text-align: right;">2.2</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">0.44</td>
+<td style="text-align: right;">1.50</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">N</td>
+<td style="text-align: right;">1.20</td>
+<td style="text-align: right;">5.1</td>
+<td style="text-align: right;">27</td>
+<td style="text-align: right;">0.99</td>
+<td style="text-align: right;">4.03</td>
+</tr>
+<tr>
+<td>Occupancy</td>
+<td style="text-align: right;">N/8</td>
+<td style="text-align: right;">0.20</td>
+<td style="text-align: right;">1.2</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">0.19</td>
+<td style="text-align: right;">1.47</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">N/4</td>
+<td style="text-align: right;">0.08</td>
+<td style="text-align: right;">3.0</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">1.29</td>
+<td style="text-align: right;">1.99</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">N/2</td>
+<td style="text-align: right;">3.53</td>
+<td style="text-align: right;">23.6</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">1.69</td>
+<td style="text-align: right;">2.27</td>
+</tr>
+<tr>
+<td></td>
+<td style="text-align: right;">N</td>
+<td style="text-align: right;">5.50</td>
+<td style="text-align: right;">13.2</td>
+<td style="text-align: right;">28</td>
+<td style="text-align: right;">1.93</td>
+<td style="text-align: right;">2.56</td>
+</tr>
+</tbody>
+</table>
+<figure>
+  <img alt="Seconds per K" src="../../assets/bound_cost.svg" width="300" />
+<br />
+<figcaption>Seconds per signal for the four ranks of each spectral resolution, from N/8 to N, averaged over each dataset: the bound with the certified FUTON in its SVD form and in its ALS form, and the four Adam runs.</figcaption>
+</figure>
+<h2 id="related-results">Related results<a class="headerlink" href="#related-results" title="Permanent link">&para;</a></h2>
+<p>The ingredients are classical; the use is in combining them for this model, where every quantity can be computed from the signal and the bound is attained. For a matrix, the best rank-<span class="arithmatex">\(R\)</span> approximation and its error are the truncated SVD's (Eckart and Young, 1936; Mirsky, 1960), which is item (4). For a tensor of order three or more, a best rank-<span class="arithmatex">\(R\)</span> CP approximation need not exist (de Silva and Lim, 2008), which is why item (2) is an infimum and items (3) bracket it. The lower bound is the tail of a matricization, the quantity that bounds the truncation error of the HOSVD (De Lathauwer, De Moor and Vandewalle, 2000) and of the TT-SVD (Oseledets, 2011) from below; the nested SVDs of Lemma 3 are the TT-SVD taken to full rank, with a greedy choice of its heaviest terms in place of a truncation, which for two modes is the Kronecker-product SVD of Van Loan and Pitsianis (1993). The separation rank of a function and its <span class="arithmatex">\(\varepsilon\)</span>-rank are the notions of the separated representations of Beylkin and Mohlenkamp (2002, 2005), fitted by alternating least squares; the proposition above says that a fixed basis inherits them up to the truncation. Learning with CP-structured Fourier coefficients appears in Kargas and Sidiropoulos (2021), with error bounds under smoothness, and with random Fourier features in Wesel and Batselier (2021); their analyses hold in expectation or asymptotically, where the theorem here is an identity for the signal at hand. For MLP-based neural fields, the structure of what a network can represent is known (Yüce, Ortiz-Jiménez, Dimitriadis and Frossard, 2022), but no analogue of item (2), the exact error of the best model at a given size, is available.</p>
+<h2 id="limitations">Limitations<a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h2>
+<p>The theorem needs the signal on its whole grid, since the coefficient tensor is a sum over every sample: it covers representation, not radiance fields or inverse problems, where the signal is observed through a renderer or an operator, and its grid norm says nothing about points off the grid. It covers the paper's model, a linear decoder without bias or output activation; the remark above says what transfers to the benchmarks' decoders, and the lower bound does not. For three or more axes the lower bound falls to the truncation once <span class="arithmatex">\(R\)</span> passes the largest <span class="arithmatex">\(K_c\)</span>, so the bracket is wide there and only the certified error is informative; a tighter lower bound for that regime is open, as is how far the certified error is from the infimum. The design corollary chooses among the candidate settings it is given; a finer grid of <span class="arithmatex">\(K\)</span> and <span class="arithmatex">\(R\)</span> costs one bound each.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../futon/" class="md-footer__link md-footer__link--prev" aria-label="Previous: FUTON">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                FUTON
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../models/" class="md-footer__link md-footer__link--next" aria-label="Next: The model zoo">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                The model zoo
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Pooya Ashtari. MIT License.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

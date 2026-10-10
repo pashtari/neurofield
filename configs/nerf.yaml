@@ -150,7 +150,7 @@ models:
       hidden_layers: 3
       mode: cp
       grid: false  # samples along rays are scattered
-    train: {lr: 1.0e-3}  # on lego, 3e-4 costs 0.2 dB and 1e-4 2.7
+    train: {lr: 1.0e-3}  # on lego, 3e-4 costs 0.2 dB and 1e-4 2.7; 3e-3 diverges
 
   FUTON-sinc:
     class: FUTON

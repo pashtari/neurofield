@@ -406,9 +406,23 @@ def style() -> None:
     )
 
 
+def detach_axes(figure: plt.Figure, offset: float = 3.0) -> None:
+    """Move the left and bottom spines ``offset`` points outward.
+
+    The axes then no longer meet in a corner, so an axis can start on a round
+    tick without its label crowding the other axis's first one, and no marker
+    on the edge of the data is cut by a spine.
+    """
+    for plot in figure.axes:
+        for side in ("left", "bottom"):
+            plot.spines[side].set_position(("outward", offset))
+
+
 def save(figure: plt.Figure, path: Path) -> None:
-    """Write a figure as PDF, and as PGF to include in a LaTeX document."""
+    """Write a figure, with its axes detached, as PDF, and as PGF to include
+    in a LaTeX document."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    detach_axes(figure)
     figure.savefig(path.with_suffix(".pdf"), bbox_inches="tight")
     try:
         figure.savefig(path.with_suffix(".pgf"), bbox_inches="tight")

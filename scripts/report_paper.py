@@ -292,7 +292,11 @@ BASES = ("Cosine", "Chebyshev", "Legendre", "Triangle", "Lanczos", "Sinc")
 PAIR = ("sinc", "lanczos")
 # Per study, its table's rows and the model each stands for, with the basis to
 # fill in; the benchmark's model heads both.
-COMBINERS = {"CP": "FUTON-{basis}", "TR": "FUTON-{basis}-TR"}
+COMBINERS = {
+    "CP": "FUTON-{basis}",
+    "TR": "FUTON-{basis}-TR",
+    "Tucker": "FUTON-{basis}-Tucker",
+}
 DECODERS = {
     "MLP, 1 hidden layer (R = 224)": "FUTON-{basis}",
     "Linear (R = 302)": "FUTON-{basis}-linear",
@@ -325,6 +329,8 @@ CURVES = {
         "FUTON-lanczos": ("CP, lanczos", PALETTE[0], DASHES[1]),
         "FUTON-sinc-TR": ("TR, sinc", PALETTE[2], DASHES[0]),
         "FUTON-lanczos-TR": ("TR, lanczos", PALETTE[2], DASHES[1]),
+        "FUTON-sinc-Tucker": ("Tucker, sinc", PALETTE[3], DASHES[0]),
+        "FUTON-lanczos-Tucker": ("Tucker, lanczos", PALETTE[3], DASHES[1]),
     },
     "decoder": {
         "FUTON-sinc": ("MLP, sinc", PALETTE[0], DASHES[0]),
@@ -333,6 +339,11 @@ CURVES = {
         "FUTON-lanczos-linear": ("Linear, lanczos", PALETTE[1], DASHES[1]),
     },
 }
+
+# The bottom of a study's PSNR axis where the range the converged values set
+# would cut a slow model's rise: the Tucker combiners pass 32 dB only after
+# 4.5 s, and 34 dB after 7 s.
+FLOORS = {"tensor_net": 32}
 
 # The error bound of FUTON with a linear decoder against FUTONs trained by Adam
 # (scripts/futon_bound.py): the datasets its figures and tables report, and the
@@ -1674,13 +1685,17 @@ def grid_figures(runs: list[dict], out_dir: Path) -> None:
 
 
 def study_curves(
-    curve: pd.DataFrame, styles: dict[str, tuple[str, str, tuple]], path: Path
+    curve: pd.DataFrame,
+    styles: dict[str, tuple[str, str, tuple]],
+    path: Path,
+    floor: float | None = None,
 ) -> None:
     """PSNR against training time for a study's models, with its own legend.
 
     ``styles`` gives each model its label, colour and dashes, in the order the
     legend takes them, over the plot. The band is one within-signal standard
-    error, as in the task figures.
+    error, as in the task figures. ``floor`` lowers the bottom of the PSNR
+    axis to show more of a slow model's rise.
     """
     curve = curve.assign(psnr=within_signal(curve, "psnr"))  # the study's every model
     curve = curve[curve["model"].isin(styles)]
@@ -1708,7 +1723,7 @@ def study_curves(
         ["psnr", "time"]
     ].mean()
     low, high = y_range(means, "psnr")
-    low, high = math.floor(low), math.ceil(high)
+    low, high = math.floor(min(low, floor or low)), math.ceil(high)
     shown = means[means["psnr"].between(low, high)]["time"]
     plot.set(
         xscale="log",
@@ -1770,7 +1785,10 @@ def ablation(out_dir: Path) -> None:
     for name, styles in CURVES.items():
         if studies[name]:
             study_curves(
-                curves(studies[name]), styles, out_dir / OUTPUTS.get(name, name)
+                curves(studies[name]),
+                styles,
+                out_dir / OUTPUTS.get(name, name),
+                FLOORS.get(name),
             )
 
 

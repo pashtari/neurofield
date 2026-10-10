@@ -56,18 +56,19 @@ Rank is the lever that keeps paying: at every α, each doubling of β raises the
 
 ## Combiner
 
-A tensor-ring combiner against the CP one, at the default K, for both bases. A ring of rank $r$ has the size of a CP combiner of rank $r^2$; rank 15 (195,528 parameters) is the closest match to the CP model (194,435).
+Tensor-ring and Tucker combiners against the CP one, at the default K, for both bases. A ring of rank $r$ has the size of a CP combiner of rank $r^2$; rank 15 (195,528 parameters) is the closest match to the CP model (194,435). Tucker takes a rank per axis in proportion to its components, $R_c = \gamma K_c$ with $\gamma = 0.162$, the closest match in size: on a 512 × 768 image it projects the axes to 41 and 62 directions and contracts them with a $41 \times 62 \times 62$ core that feeds a 62-wide decoder, 196,003 parameters.
 
 | Combiner | #Params (k) | FUTON-sinc Training time (s) ↓ | FUTON-sinc PSNR (dB) ↑ | FUTON-lanczos Training time (s) ↓ | FUTON-lanczos PSNR (dB) ↑ |
 | --- | --- | --- | --- | --- | --- |
-| CP | 194.4 | **8.2** | **38.54** ± 0.05 | **6.1** | **38.20** ± 0.03 |
-| TR | 195.5 | _13.0_ | _38.44_ ± 0.04 | _10.8_ | _38.08_ ± 0.04 |
+| CP | 194.4 | **8.2** | **38.54** ± 0.09 | **6.1** | **38.20** ± 0.06 |
+| TR | 195.5 | 13.0 | _38.44_ ± 0.05 | _10.8_ | _38.08_ ± 0.04 |
+| Tucker | 196.0 | _12.9_ | 35.90 ± 0.10 | 13.0 | 35.54 ± 0.10 |
 
 <figure markdown="span">
   ![Combiner convergence](../assets/ablation_combiner.svg){ width="520" }
 </figure>
 
-CP wins on both counts, by 0.1 dB and 1.6 to 1.8× in training time. The ring's $r \times r$ matrices per point cost more to contract than CP's $R$ products, and its output is only $r^2 = 225$ wide, which the decoder then has to close.
+CP wins on both counts: by 0.1 dB and 1.6 to 1.8× in training time over the ring, whose $r \times r$ matrices per point cost more to contract than CP's $R$ products and whose output is only $r^2 = 225$ wide, which the decoder then has to close; and by 2.6 to 2.7 dB and 1.6 to 2.1× over Tucker, whose core holds 158k of its parameters while each axis passes through only 41 or 62 directions against CP's 224, and whose core contraction makes it as slow as the ring or slower.
 
 ## Decoder
 

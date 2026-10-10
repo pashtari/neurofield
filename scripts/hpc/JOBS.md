@@ -42,11 +42,13 @@ decoder (194,435 parameters).
 | --- | --- | --- |
 | `basis` | `FUTON-<basis>`, 6 | cosine, lanczos, sinc, triangle, chebyshev and legendre, at the default size |
 | `components_rank` | `FUTON-<basis>-a<alpha>-b<beta>`, 50 | K = (alpha H, alpha W) and R = beta min(K), both over {1/8, 1/4, 1/2, 1, 2}, for lanczos and sinc |
-| `tensor_net` | `FUTON-<basis>` and `FUTON-<basis>-TR`, 4 | a tensor-ring combiner against the default CP one, for lanczos and sinc |
+| `tensor_net` | `FUTON-<basis>`, `-TR` and `-Tucker`, 6 | tensor-ring and Tucker combiners against the default CP one, for lanczos and sinc |
 | `decoder` | `FUTON-<basis>` and `-linear`, 4 | the paper's linear decoder against the benchmark's MLP, at equal size |
 
 A tensor ring of rank `r` has the size of a CP combiner of rank `r^2`; rank 15
-gives 195,528 parameters, the closest to the CP model's 194,435. The MLP
+gives 195,528 parameters, the closest to the CP model's 194,435, and Tucker of
+ranks `R_c = 0.162 K_c`, (41, 62) with a `41 x 62 x 62` core feeding a 62-wide
+decoder, 196,003. The MLP
 decoder holds 51,075 of those parameters, 26% of the model, which a linear
 decoder returns to the combiner as CP rank 302 (194,189 parameters). The CP
 models of `tensor_net` and `decoder` repeat those of `basis`, so that each

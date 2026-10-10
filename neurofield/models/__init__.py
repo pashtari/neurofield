@@ -15,6 +15,7 @@ from .futon import (
     LegendreBasis,
     SincBasis,
     TRCombiner,
+    TuckerCombiner,
     TriangleBasis,
 )
 from .futon_bounds import FUTONBound, futon_bound
@@ -65,6 +66,7 @@ __all__ = [
     "HadamardCombiner",
     "CPCombiner",
     "TRCombiner",
+    "TuckerCombiner",
     "FUTON",
     "BCD",
     "LeastSquares",

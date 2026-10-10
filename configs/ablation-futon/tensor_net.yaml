@@ -1,7 +1,11 @@
-# FUTON ablation on the image task: a tensor-ring combiner (-TR) against the
-# default CP one, for the lanczos and sinc bases at K = (H / 2, W / 2).
-# Tensor-ring rank 15 comes closest in size: its 15^2 = 225 features cost what
-# CP rank 224 does.
+# FUTON ablation on the image task: a tensor-ring combiner (-TR) and a Tucker
+# combiner (-Tucker) against the default CP one, for the lanczos and sinc bases
+# at K = (H / 2, W / 2). Tensor-ring rank 15 comes closest in size: its
+# 15^2 = 225 features cost what CP rank 224 does. Tucker takes a rank per
+# axis in proportion to its components, R_c = gamma K_c with gamma = 0.162, the
+# ratio that comes closest in size: (41, 62) on a 512 x 768 image, a
+# 41 x 62 x 62 core fed to a 62-wide decoder, 196,003 parameters against the
+# CP model's 194,435.
 #     python scripts/train_image.py --config configs/ablation-futon/tensor_net.yaml
 # The data and training settings repeat configs/image.yaml.
 
@@ -47,6 +51,24 @@ models:
     kwargs:
       basis: [sinc, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
       combiner: [tr, {rank: 15}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-lanczos-Tucker:
+    class: FUTON
+    kwargs:
+      basis: [lanczos, {num_components: [H // 2, W // 2], radius: 3}]
+      combiner: [tucker, {rank: ["H // 2 * 162 // 1000", "W // 2 * 162 // 1000"]}]
+      decoder: [mlp, {hidden_layers: 1}]
+      output_activation: tanh
+    train: {lr: 3.0e-2}
+
+  FUTON-sinc-Tucker:
+    class: FUTON
+    kwargs:
+      basis: [sinc, {num_components: [H // 2, W // 2], grid_size: [H, W]}]
+      combiner: [tucker, {rank: ["H // 2 * 162 // 1000", "W // 2 * 162 // 1000"]}]
       decoder: [mlp, {hidden_layers: 1}]
       output_activation: tanh
     train: {lr: 3.0e-2}

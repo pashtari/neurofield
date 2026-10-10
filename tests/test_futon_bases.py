@@ -14,6 +14,7 @@ from neurofield.models.futon import (
     LegendreBasis,
     SincBasis,
     TRCombiner,
+    TuckerCombiner,
     TriangleBasis,
 )
 
@@ -284,7 +285,7 @@ class TestSparseEqualsDense:
 
 class TestCombiners:
     @pytest.mark.parametrize("device", DEVICES)
-    @pytest.mark.parametrize("combiner_cls", [CPCombiner, TRCombiner])
+    @pytest.mark.parametrize("combiner_cls", [CPCombiner, TRCombiner, TuckerCombiner])
     def test_matches_dense_path(self, device, combiner_cls):
         torch.manual_seed(0)
         K, C = 32, 2
@@ -299,6 +300,15 @@ class TestCombiners:
         grads = torch.autograd.grad(out, params, grad)
         for got, expected in zip(grads, torch.autograd.grad(ref, params, grad)):
             assert torch.allclose(got, expected, atol=1e-4)
+
+    def test_tucker_contracts_the_core(self):
+        torch.manual_seed(0)
+        combiner = TuckerCombiner([7, 6, 5], rank=[3, 4, 2])
+        assert combiner.core.shape == (3, 4, 2, 4)  # out_features: the largest rank
+        features = [torch.randn(10, width) for width in (7, 6, 5)]
+        a, b, c = (linear(f) for linear, f in zip(combiner.linears, features))
+        expected = torch.einsum("na,nb,nc,abco->no", a, b, c, combiner.core)
+        assert torch.allclose(combiner(features), expected, atol=1e-5)
 
     @pytest.mark.parametrize("device", DEVICES)
     def test_hadamard_densifies(self, device):

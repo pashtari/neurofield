@@ -28,6 +28,7 @@ from collections.abc import Callable, Sequence
 from functools import reduce
 from operator import mul
 
+import opt_einsum as oe
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
@@ -46,6 +47,7 @@ __all__ = [
     "HadamardCombiner",
     "CPCombiner",
     "TRCombiner",
+    "TuckerCombiner",
     "FUTON",
 ]
 
@@ -630,6 +632,78 @@ class TRCombiner(_Combiner):
         return reduce(torch.matmul, matrices).flatten(start_dim=-2)
 
 
+class TuckerCombiner(_Combiner):
+    r"""Tucker combiner.
+
+    Projects axis ``c`` to ``rank[c]`` channels, as the CP combiner does, and
+    contracts the projections with a core of shape
+    ``(rank[0], ..., rank[C - 1], out_features)`` instead of multiplying them
+    elementwise: with a linear decoder the weight tensor is in Tucker format,
+    the core with one factor matrix per axis and the decoder as the last.
+    CP is the special case of a superdiagonal core. This extends the paper's
+    CP model. RCS features are projected without densifying, and the core
+    absorbs one projection at a time, largest rank first.
+
+    Args:
+        in_features: Feature width ``K_c`` of each axis.
+        rank: Multilinear rank, one per axis or one for all.
+        out_features: Width of the output, the core's last mode; ``None``
+            takes the largest rank.
+
+    Shape:
+        - Input: ``C`` tensors of shape :math:`(N, K_c)`.
+        - Output: :math:`(N, \text{out\_features})`.
+
+    References:
+        Tucker, "Some mathematical notes on three-mode factor analysis",
+        Psychometrika 1966.
+    """
+
+    def __init__(
+        self,
+        in_features: Sequence[int],
+        rank: int | Sequence[int],
+        out_features: int | None = None,
+    ) -> None:
+        super().__init__(in_features)
+        modes = len(self.in_features)
+        self.rank = [rank] * modes if isinstance(rank, int) else list(rank)
+        if len(self.rank) != modes:
+            raise ValueError(f"Expected {modes} ranks, one per axis, got {self.rank}")
+        self.out_features = max(self.rank) if out_features is None else out_features
+        self.linears = nn.ModuleList(
+            nn.Linear(width, r, bias=False) for width, r in zip(in_features, self.rank)
+        )
+        self.core = nn.Parameter(torch.empty(*self.rank, self.out_features))
+        # The core absorbs one projection at a time, largest rank first, so
+        # the intermediates stay smallest and lead with the points (the
+        # ellipsis); opt_einsum's own optimum starts with an outer product of
+        # the projections, slower and larger. Each result goes to the end of
+        # the operands, hence the path; given the path, the points' count of 1
+        # is a placeholder.
+        self.order = sorted(range(modes), key=self.rank.__getitem__, reverse=True)
+        self.contract = oe.contract_expression(
+            tuple(self.core.shape),
+            [*range(modes + 1)],
+            *(arg for c in self.order for arg in ((1, self.rank[c]), [..., c])),
+            [..., modes],
+            optimize=[(0, 1)] + [(0, n) for n in range(modes - 1, 0, -1)],
+        )
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        """Initialize the factors and the core with Kaiming-uniform weights."""
+        for linear in self.linears:
+            nn.init.kaiming_uniform_(linear.weight)
+        nn.init.kaiming_uniform_(self.core.view(-1, self.out_features))
+
+    def forward(self, features: Sequence[Tensor]) -> Tensor:
+        projections = [
+            _project(feature, linear) for feature, linear in zip(features, self.linears)
+        ]
+        return self.contract(self.core, *(projections[c] for c in self.order))
+
+
 # FUTON --------------------------------------------------------------------------------
 
 
@@ -729,6 +803,7 @@ COMBINERS: dict[str, type[nn.Module]] = {
     "hadamard": HadamardCombiner,
     "cp": CPCombiner,
     "tr": TRCombiner,
+    "tucker": TuckerCombiner,
 }
 
 DECODERS: dict[str, type[nn.Module]] = {

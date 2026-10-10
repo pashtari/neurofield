@@ -47,8 +47,8 @@ Writes results/, which holds the paper's figures and tables and nothing else:
                                      the best FUTON lies
     bound/decomposition.{pdf,pgf}    Adam's error at K = N/2 split as the bound
                                      splits it, per rank
-    bound/cost.{pdf,pgf}             seconds for the bound at five ranks, in
-                                     either form, against the five Adam runs
+    bound/cost.{pdf,pgf}             seconds for the bound at every rank of a K,
+                                     in either form, against the Adam runs
     bound/table.{tex,md}             the means per setting, the smallest setting
                                      certified for a target PSNR, the SVD form
                                      and the optimizer checks
@@ -1806,6 +1806,11 @@ def ablation(out_dir: Path) -> None:
             )
 
 
+def resolution(alpha: float) -> str:
+    """A spectral resolution K = alpha N as text: N/8, N/4, N/2 or N."""
+    return "N" + FRACTIONS[alpha][1:]
+
+
 def bound_records(task: str) -> pd.DataFrame:
     """Every recorded sinc setting of the error bound on a task, one row each,
     with PSNRs."""
@@ -1930,9 +1935,10 @@ def bound_decomposition(frames: dict[str, pd.DataFrame]) -> plt.Figure:
 
 
 def bound_cost(frames: dict[str, pd.DataFrame]) -> plt.Figure:
-    """Seconds per signal for the five ranks of each K: the bound with the
+    """Seconds per signal for every rank of each K: the bound with the
     certified FUTON in its SVD form and in its ALS form, which do every rank
-    at once, against the five Adam runs, all averaged over the signals."""
+    at once, against the Adam runs, one per rank, all averaged over the
+    signals."""
     bars = {"closed": (RAMP[0], "SVD"), "bound": (RAMP[3], "ALS"),
             "adam": ("0.7", "Adam")}  # fmt: skip
     figure, plot = plt.subplots(figsize=(SIZE[0], SIZE[1] + 2 * LEGEND_ROW))
@@ -1950,7 +1956,7 @@ def bound_cost(frames: dict[str, pd.DataFrame]) -> plt.Figure:
             for i, (key, (color, _)) in enumerate(bars.items()):
                 offset = (i - (len(bars) - 1) / 2) * width
                 plot.bar(position + offset, group[key].mean(), width, color=color)
-            labels.append(rf"$N/{FRACTIONS[alpha].split('/')[1]}$")
+            labels.append(f"${resolution(alpha)}$")
             positions.append(position)
             position += 1
         centres[task] = (first + position - 1) / 2
@@ -2004,18 +2010,20 @@ def bound_cell(mean: float, sem: float) -> str:
     return f"{mean:.2f} ± {sem:.2f}"
 
 
-def bound_tables(frames: dict[str, pd.DataFrame]) -> list[dict]:
+def bound_tables(
+    frames: dict[str, pd.DataFrame], every: dict[str, pd.DataFrame]
+) -> list[dict]:
     """The report's tables: means over each task's signals per setting, the
-    design for a target PSNR, the SVD form and the optimizer checks.
-    Each is a title, a note, a header of (group, title) pairs and rows of
-    text."""
+    design for a target PSNR and the optimizer checks, from ``frames``, and
+    the SVD form's cost, from ``every``, which adds K = N. Each is a title, a
+    note, a header of (group, title) pairs and rows of text."""
     built = []
     columns = ["truncation_psnr", "upper_psnr", "lower_psnr", "adam_psnr"]
     for task, frame in frames.items():
         stats = bound_means(frame, columns)
         seconds = frame.groupby(["alpha", "R"])[["bound_seconds", "adam_seconds"]]
         rows = [
-            [f"N{FRACTIONS[alpha][1:]}", str(rank),
+            [resolution(alpha), str(rank),
              *(bound_cell(*stats.loc[(alpha, rank, key)]) for key in columns),
              f"{row.bound_seconds:.1f}", f"{row.adam_seconds:.1f}"]
             for (alpha, rank), row in seconds.mean().iterrows()
@@ -2051,13 +2059,13 @@ def bound_tables(frames: dict[str, pd.DataFrame]) -> list[dict]:
                 f"{row.parameters_bound / 1e3:.1f}", f"{row.parameters_adam / 1e3:.1f}",
             ] for _, row in picks.iterrows()],
         })  # fmt: skip
-    for task, frame in frames.items():
+    for task, frame in every.items():
         rows = []
         for alpha, group in frame.groupby("alpha"):
             per_signal = group.groupby("signal")
             gap = group["upper_psnr"] - group["closed_psnr"]
             rows.append([
-                f"N{FRACTIONS[alpha][1:]}",
+                resolution(alpha),
                 f"{per_signal['closed_seconds'].first().mean():.2f}",
                 f"{per_signal['bound_seconds'].first().mean():.1f}",
                 f"{per_signal['adam_seconds'].sum().mean():.0f}",
@@ -2065,9 +2073,9 @@ def bound_tables(frames: dict[str, pd.DataFrame]) -> list[dict]:
             ])  # fmt: skip
         built.append({
             "title": f"{task}: the SVD form",
-            "note": "Seconds per signal for the five ranks, averaged over the signals: "
-                    "the bound with the certified FUTON in its SVD form (no sweeps), "
-                    "in its ALS form, and the five Adam runs; and how far below the "
+            "note": "Seconds per signal for every rank of a K, averaged over the "
+                    "signals: the bound with the certified FUTON in its SVD form (no "
+                    "sweeps), in its ALS form, and the Adam runs; and how far below the "
                     "ALS form the SVD form certifies, in dB, over the signals and "
                     "ranks.",
             "header": [("", "K"), ("Seconds", "SVD"), ("Seconds", "ALS"),
@@ -2162,18 +2170,20 @@ def bound_latex(built: list[dict]) -> str:
 def bound(out_dir: Path) -> None:
     """The figures and tables of the error bound, from the records of
     scripts/futon_bound.py."""
-    frames = {
+    every = {
         task: bound_records(task)
         for task in BOUND_DATASETS
         if (ROOT / "logs" / "bound" / task).exists()
     }
-    if not frames:
+    if not every:
         print("bound: no records under logs/bound, skipped")
         return
+    # K = N enters the cost alone, where it shows how the time grows with K.
+    frames = {task: frame[frame["alpha"] < 1] for task, frame in every.items()}
     save(bound_gap(frames), out_dir / "gap")
     save(bound_decomposition(frames), out_dir / "decomposition")
-    save(bound_cost(frames), out_dir / "cost")
-    built = bound_tables(frames)
+    save(bound_cost(every), out_dir / "cost")
+    built = bound_tables(frames, every)
     (out_dir / "table.md").write_text(bound_markdown(built))
     (out_dir / "table.tex").write_text(bound_latex(built))
     print(f"bound: written to {out_dir}")

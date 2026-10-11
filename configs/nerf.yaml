@@ -143,9 +143,10 @@ models:
   F-INR:  # Vemuri et al. (WACV 2026): SIREN axes and CP
     class: FINR
     kwargs:
-      # tuned on lego: the tensor train its authors pick for NeRF, rank 6 at the
-      # same size, is 2.9 dB worse and twice as slow
-      rank: 16
+      # The budget counts the field's colour network too; rank 14 reaches it.
+      # Tuned on lego at rank 16, 8% over it: the tensor train its authors pick
+      # for NeRF, rank 6 at that size, is 2.9 dB worse and twice as slow.
+      rank: 14
       hidden_features: 64
       hidden_layers: 3
       mode: cp
